@@ -256,6 +256,8 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Snotch uses your microphone to sync your teleprompter scroll with your voice in real time.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Snotch uses speech recognition to capture your spoken sample and match script style to your natural speaking voice.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -286,6 +288,8 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Snotch uses your microphone to sync your teleprompter scroll with your voice in real time.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Snotch uses speech recognition to capture your spoken sample and match script style to your natural speaking voice.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
