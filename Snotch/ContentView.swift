@@ -1322,7 +1322,7 @@ struct ContentView: View {
 
     private var backendBaseURL: String {
         #if DEBUG
-        return "http://localhost:8787"
+        return "http://127.0.0.1:8787"
         #else
         return "https://api.snotch.app"
         #endif
