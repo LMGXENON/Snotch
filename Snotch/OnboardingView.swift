@@ -23,232 +23,105 @@ struct OnboardingView: View {
     let onComplete: () -> Void
 
     private let steps: [OnboardingStep] = [
-        OnboardingStep(icon: "waveform.badge.mic",  title: "Welcome to Snotch", subtitle: "Your voice-synced teleprompter that lives near the notch and stays out of your way.", actionLabel: nil),
-        OnboardingStep(icon: "lock.shield", title: "Privacy First", subtitle: "Speech processing stays on your Mac. Your script and voice data are not uploaded by default.", actionLabel: nil),
-        OnboardingStep(icon: "mic.fill", title: "Microphone Access", subtitle: "Allow microphone so Snotch can detect your voice and move the script naturally.", actionLabel: "Allow Microphone"),
-        OnboardingStep(icon: "waveform", title: "Speech Recognition", subtitle: "Allow speech recognition for style capture and smoother speaking-aware controls.", actionLabel: "Allow Speech Recognition"),
-        OnboardingStep(icon: "keyboard", title: "Accessibility", subtitle: "Optional: enable accessibility so global shortcuts work while other apps are focused.", actionLabel: "Open Settings"),
-        OnboardingStep(icon: "gauge.with.dots.needle.67percent", title: "Calibrate Voice Pace", subtitle: "Read aloud for 10 seconds so Snotch can estimate your natural speaking speed.", actionLabel: "Start Speaking"),
-        OnboardingStep(icon: "checkmark.seal.fill", title: "Ready", subtitle: "Open a script, hit play, and let Snotch follow your voice flow.", actionLabel: "Start Using Snotch"),
+        OnboardingStep(icon: "waveform.badge.mic",  title: "Welcome to Snotch",     subtitle: "Your teleprompter that lives in the notch and follows your voice — invisibly.", actionLabel: nil),
+        OnboardingStep(icon: "lock.shield",          title: "Privacy First",          subtitle: "All speech recognition runs 100% on your Mac. Nothing leaves your device.", actionLabel: nil),
+        OnboardingStep(icon: "mic.fill",             title: "Microphone Access",      subtitle: "Snotch needs your microphone to hear your voice and sync in real time.", actionLabel: "Allow Microphone"),
+        OnboardingStep(icon: "waveform",             title: "Speech Recognition",     subtitle: "On-device speech recognition powers the voice-to-scroll engine.", actionLabel: "Allow Speech Recognition"),
+        OnboardingStep(icon: "keyboard",             title: "Accessibility",          subtitle: "Optional: Enable Accessibility for global hotkeys to work when other apps are in focus.", actionLabel: "Open Settings"),
+        OnboardingStep(icon: "gauge.with.dots.needle.67percent", title: "Calibrate Your Voice", subtitle: "Read aloud for 10 seconds so Snotch can learn your speaking speed.", actionLabel: "Start Speaking"),
+        OnboardingStep(icon: "checkmark.seal.fill",  title: "You're All Set!",        subtitle: "Open your first script, press play, and let Snotch follow your words.", actionLabel: "Start Using Snotch"),
     ]
 
     var body: some View {
-        ZStack {
-            LinearGradient(
-                stops: [
-                    .init(color: Color(white: 0.06), location: 0),
-                    .init(color: Color(white: 0.09), location: 0.45),
-                    .init(color: Color(white: 0.12), location: 1)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(Color.white.opacity(0.05))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.10), lineWidth: 0.6)
-                )
-                .padding(14)
-
-            HStack(spacing: 0) {
-                leftPane
-                    .frame(width: 250)
-                Rectangle()
-                    .fill(Color.white.opacity(0.08))
-                    .frame(width: 0.5)
-                rightPane
-                    .frame(maxWidth: .infinity)
-            }
-            .padding(14)
+        HStack(spacing: 0) {
+            leftPane.frame(maxWidth: .infinity)
+            rightPane.frame(maxWidth: .infinity)
         }
-        .frame(width: 900, height: 620)
+        .frame(width: 820, height: 540)
         .onAppear { checkCurrentPermissions() }
-        .preferredColorScheme(.dark)
-    }
-
-    private var grantedCount: Int {
-        [micGranted, speechGranted, accessibilityOK].filter { $0 }.count
     }
 
     private var leftPane: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Snotch")
-                    .font(.custom("Didot", size: 42))
-                    .kerning(1.2)
-                    .foregroundColor(.white)
-                Text("Voice-synced teleprompter")
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundColor(.white.opacity(0.55))
-            }
-
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.white.opacity(0.07))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5)
-                )
-                .frame(height: 150)
-                .overlay(
-                    VStack(spacing: 10) {
-                        ZStack {
-                            Circle()
-                                .fill(Color.white.opacity(0.10))
-                                .frame(width: 62, height: 62)
-                            Image(systemName: steps[currentStep].icon)
-                                .font(.system(size: 26, weight: .semibold))
-                                .foregroundColor(Color.white.opacity(0.88))
-                        }
-                        Text("Step \(currentStep + 1) of \(steps.count)")
-                            .font(.system(size: 11, weight: .medium, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.58))
-                    }
-                )
-
-            VStack(alignment: .leading, spacing: 10) {
-                ForEach(0..<steps.count, id: \.self) { idx in
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(idx <= currentStep ? Color.white.opacity(0.75) : Color.white.opacity(0.18))
-                            .frame(width: 6, height: 6)
-                        Text(steps[idx].title)
-                            .font(.system(size: 11, weight: idx == currentStep ? .semibold : .regular))
-                            .foregroundColor(Color.white.opacity(idx == currentStep ? 0.86 : 0.48))
-                            .lineLimit(1)
-                    }
+        ZStack {
+            RadialGradient(
+                colors: [
+                    Color(red: 0.25, green: 0.45, blue: 0.98),
+                    Color(red: 0.55, green: 0.20, blue: 0.90),
+                    Color(red: 0.10, green: 0.05, blue: 0.35)
+                ],
+                center: .topLeading, startRadius: 30, endRadius: 520
+            )
+            VStack(spacing: 20) {
+                Spacer()
+                ZStack {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .fill(.white.opacity(0.15))
+                        .frame(width: 80, height: 80)
+                    Image(systemName: steps[currentStep].icon)
+                        .font(.system(size: 36, weight: .semibold))
+                        .foregroundColor(.white)
                 }
+                .animation(.spring(response: 0.5, dampingFraction: 0.7), value: currentStep)
+                Text("Snotch")
+                    .font(.system(size: 32, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                Text("Voice-Synced Teleprompter")
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .foregroundColor(.white.opacity(0.7))
+                Spacer()
+                stepDots.padding(.bottom, 32)
             }
-            Spacer()
+            .padding(32)
         }
-        .padding(24)
     }
 
     private var rightPane: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            onboardingTopBar
-                .padding(.horizontal, 52)
-                .padding(.top, 16)
-
-            VStack(alignment: .leading, spacing: 14) {
-                Text(steps[currentStep].title)
-                    .font(.custom("Didot", size: 44))
-                    .kerning(1.0)
-                    .foregroundColor(.white)
-                    .id("title-\(currentStep)")
-
-                Text(steps[currentStep].subtitle)
-                    .font(.system(size: 15, weight: .regular, design: .rounded))
-                    .foregroundColor(.white.opacity(0.70))
-                    .lineSpacing(3)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .id("sub-\(currentStep)")
-
-                stepSpecificContent
-                    .padding(.top, 10)
-            }
-            .padding(.horizontal, 52)
-            .padding(.top, 84)
-            .animation(.easeInOut(duration: 0.25), value: currentStep)
-
-            Spacer()
-
-            VStack(spacing: 16) {
-                progressTrack
-
+        ZStack {
+            Color(red: 0.10, green: 0.10, blue: 0.12)
+            VStack(alignment: .leading, spacing: 0) {
+                Spacer()
+                VStack(alignment: .leading, spacing: 16) {
+                    Text(steps[currentStep].title)
+                        .font(.system(size: 26, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .id("title-\(currentStep)")
+                    Text(steps[currentStep].subtitle)
+                        .font(.system(size: 15, weight: .regular, design: .rounded))
+                        .foregroundColor(.white.opacity(0.7))
+                        .lineSpacing(4)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .id("sub-\(currentStep)")
+                    stepSpecificContent.padding(.top, 8)
+                }
+                .padding(.horizontal, 48)
+                .animation(.easeInOut(duration: 0.35), value: currentStep)
+                Spacer()
                 HStack {
                     if currentStep > 0 {
                         Button("Back") { withAnimation { currentStep -= 1 } }
-                            .buttonStyle(OnboardingGhostButtonStyle())
+                            .buttonStyle(GhostButtonStyle())
                     }
-
                     Spacer()
-
+                    stepDots
+                    Spacer()
+                    // Skip for accessibility and calibration steps
                     if currentStep == 4 || currentStep == 5 {
                         Button("Skip") {
                             withAnimation { currentStep += 1 }
                         }
-                        .buttonStyle(OnboardingGhostButtonStyle())
+                        .buttonStyle(GhostButtonStyle())
                     }
-
-                    Button(
-                        speechManager.isCalibrating
-                        ? "Done (\(calibrationSeconds)s)"
-                        : steps[currentStep].actionLabel ?? (currentStep == steps.count - 1 ? "Get Started" : "Continue")
-                    ) {
+                    Button(speechManager.isCalibrating ? "Done (\(calibrationSeconds)s)" :
+                           steps[currentStep].actionLabel ?? (currentStep == steps.count - 1 ? "Get Started" : "Continue")) {
                         handleAction()
                     }
-                    .buttonStyle(OnboardingPrimaryButtonStyle())
+                    .buttonStyle(PrimaryButtonStyle())
                     .disabled(speechManager.isCalibrating && calibrationSeconds > 0)
                 }
-            }
-            .padding(.horizontal, 52)
-            .padding(.bottom, 24)
-        }
-    }
-
-    private var onboardingTopBar: some View {
-        HStack(spacing: 12) {
-            Text("Setup")
-                .font(.system(size: 10, weight: .semibold, design: .rounded))
-                .foregroundColor(.white.opacity(0.56))
-
-            Rectangle()
-                .fill(Color.white.opacity(0.10))
-                .frame(width: 0.5, height: 14)
-
-            HStack(spacing: 6) {
-                statusChip(label: "Mic", ok: micGranted)
-                statusChip(label: "Speech", ok: speechGranted)
-                statusChip(label: "Access", ok: accessibilityOK)
-            }
-
-            Spacer()
-
-            Text("\(grantedCount)/3 ready")
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                .foregroundColor(.white.opacity(0.60))
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 9)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.white.opacity(0.05))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5)
-                )
-        )
-    }
-
-    private func statusChip(label: String, ok: Bool) -> some View {
-        Text(label)
-            .font(.system(size: 9.5, weight: .semibold, design: .rounded))
-            .foregroundColor(.white.opacity(ok ? 0.90 : 0.52))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(
-                Capsule()
-                    .fill(Color.white.opacity(ok ? 0.18 : 0.08))
-            )
-    }
-
-    private var progressTrack: some View {
-        GeometryReader { geo in
-            let fraction = Double(currentStep + 1) / Double(steps.count)
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(Color.white.opacity(0.12))
-                    .frame(height: 5)
-                Capsule()
-                    .fill(Color.white.opacity(0.75))
-                    .frame(width: max(0, geo.size.width * fraction), height: 5)
-                    .animation(.easeInOut(duration: 0.25), value: currentStep)
+                .padding(.horizontal, 48)
+                .padding(.bottom, 36)
             }
         }
-        .frame(height: 5)
     }
 
     @ViewBuilder
@@ -274,10 +147,10 @@ struct OnboardingView: View {
                     // Animated mic indicator
                     ZStack {
                         Circle()
-                            .fill(Color.white.opacity(0.14))
+                            .fill(Color.red.opacity(0.2))
                             .frame(width: 40, height: 40)
                         Image(systemName: "mic.fill")
-                            .foregroundColor(.white.opacity(0.9))
+                            .foregroundColor(.red)
                     }
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Listening...")
@@ -293,14 +166,7 @@ struct OnboardingView: View {
                         .foregroundColor(.white)
                 }
                 .padding(14)
-                .background(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color.white.opacity(0.06))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5)
-                        )
-                )
+                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.white.opacity(0.05)))
 
                 // Sample text to read
                 Text("\"The quick brown fox jumps over the lazy dog. Pack my box with five dozen liquor jugs.\"")
@@ -313,24 +179,17 @@ struct OnboardingView: View {
                 HStack(spacing: 12) {
                     ZStack {
                         Circle()
-                            .fill(Color.white.opacity(0.12))
+                            .fill(Color.green.opacity(0.2))
                             .frame(width: 40, height: 40)
                         Image(systemName: "checkmark")
-                            .foregroundColor(.white.opacity(0.9))
+                            .foregroundColor(.green)
                     }
                     Text("Voice speed calibrated!")
                         .foregroundColor(.white)
                         .font(.system(size: 14, weight: .semibold, design: .rounded))
                 }
                 .padding(14)
-                .background(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color.white.opacity(0.06))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5)
-                        )
-                )
+                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.green.opacity(0.08)))
             } else {
                 Text("Tap \"Start Speaking\" and read anything aloud for 10 seconds. Snotch will learn your natural speaking pace.")
                     .font(.system(size: 13, design: .rounded))
@@ -423,66 +282,55 @@ struct PermissionToggleRow: View {
         HStack(spacing: 14) {
             ZStack {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(granted ? Color.white.opacity(0.12) : Color.white.opacity(0.08))
+                    .fill(granted ? Color.green.opacity(0.2) : Color.white.opacity(0.08))
                     .frame(width: 40, height: 40)
-                Image(systemName: icon).foregroundColor(granted ? .white : .white.opacity(0.6))
+                Image(systemName: icon).foregroundColor(granted ? .green : .white.opacity(0.6))
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(label).foregroundColor(.white).font(.system(size: 14, weight: .semibold, design: .rounded))
                 Text(granted ? "Granted ✓" : "Not yet granted")
-                    .foregroundColor(granted ? .white.opacity(0.75) : .white.opacity(0.4))
+                    .foregroundColor(granted ? .green : .white.opacity(0.4))
                     .font(.system(size: 12, design: .rounded))
             }
             Spacer()
             ZStack {
-                Capsule().fill(granted ? Color.white.opacity(0.7) : Color.white.opacity(0.15)).frame(width: 44, height: 26)
+                Capsule().fill(granted ? Color.green : Color.white.opacity(0.15)).frame(width: 44, height: 26)
                 Circle().fill(.white).frame(width: 20, height: 20)
                     .offset(x: granted ? 9 : -9)
                     .animation(.spring(response: 0.3, dampingFraction: 0.7), value: granted)
             }
         }
         .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.white.opacity(0.05))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5)
-                )
-        )
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.white.opacity(0.05)))
     }
 }
 
-struct OnboardingPrimaryButtonStyle: ButtonStyle {
+struct PrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 14, weight: .semibold, design: .rounded))
-            .foregroundColor(.black)
+            .foregroundColor(.white)
             .padding(.horizontal, 24)
             .padding(.vertical, 10)
             .background(
-                Capsule()
-                    .fill(Color.white.opacity(configuration.isPressed ? 0.75 : 0.92))
+                LinearGradient(
+                    colors: [Color(red: 0.3, green: 0.5, blue: 1.0), Color(red: 0.6, green: 0.2, blue: 0.9)],
+                    startPoint: .leading, endPoint: .trailing
+                )
             )
-            .overlay(
-                Capsule()
-                    .strokeBorder(Color.white.opacity(0.25), lineWidth: 0.6)
-            )
+            .clipShape(Capsule())
+            .opacity(configuration.isPressed ? 0.8 : 1.0)
     }
 }
 
-struct OnboardingGhostButtonStyle: ButtonStyle {
+struct GhostButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 14, weight: .medium, design: .rounded))
-            .foregroundColor(.white.opacity(0.75))
+            .foregroundColor(.white.opacity(0.6))
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .background(Color.white.opacity(configuration.isPressed ? 0.14 : 0.07))
-            .overlay(
-                Capsule()
-                    .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.5)
-            )
+            .background(Color.white.opacity(configuration.isPressed ? 0.1 : 0.05))
             .clipShape(Capsule())
     }
 }

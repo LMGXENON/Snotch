@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Snotch Admin</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #0e1117;
+        color: #e5e7eb;
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+      }
+      .card {
+        width: min(680px, calc(100vw - 32px));
+        background: #151a23;
+        border: 1px solid #2b3342;
+        border-radius: 14px;
+        padding: 18px;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 30px;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        margin: 10px 0;
+      }
+      input, button {
+        border-radius: 10px;
+        border: 1px solid #2f3a4f;
+        background: #0f141e;
+        color: #e5e7eb;
+        padding: 10px 12px;
+      }
+      input { flex: 1; }
+      button { cursor: pointer; background: #1b2432; }
+      .ok { color: #4ade80; }
+      .err { color: #ef4444; }
+      code {
+        background: #0f141e;
+        border: 1px solid #2f3a4f;
+        padding: 2px 6px;
+        border-radius: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Snotch Admin</h1>
+      <div>Enter your admin key to verify backend access.</div>
+      <div class="row">
+        <input id="adminKey" placeholder="ADMIN_API_KEY" />
+        <button id="checkBtn">Verify</button>
+      </div>
+      <div id="status"></div>
+      <div style="margin-top:12px;opacity:.8;font-size:13px;">
+        API: <code>/v1/admin/auth</code> and <code>/v1/admin/licenses</code>
+      </div>
+    </div>
+    <script>
+      const key = document.getElementById('adminKey');
+      const btn = document.getElementById('checkBtn');
+      const status = document.getElementById('status');
+      btn.onclick = async () => {
+        status.textContent = 'Checking...';
+        status.className = '';
+        try {
+          const res = await fetch('/v1/admin/auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ adminKey: key.value.trim() })
+          });
+          const data = await res.json();
+          if (!res.ok || data.ok === false) throw new Error(data.message || 'Auth failed');
+          status.textContent = 'Authorized';
+          status.className = 'ok';
+        } catch (e) {
+          status.textContent = e.message;
+          status.className = 'err';
+        }
+      };
+    </script>
+  </body>
+</html>

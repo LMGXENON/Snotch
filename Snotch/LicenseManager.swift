@@ -10,7 +10,7 @@ final class LicenseManager: ObservableObject {
     private let keyAccount = "license.key"
     private let activationAccount = "license.activation"
     #if DEBUG
-    private let apiBaseURL = "http://localhost:8787"
+    private let apiBaseURL = "http://127.0.0.1:8787"
     #else
     private let apiBaseURL = "https://api.snotch.app"
     #endif

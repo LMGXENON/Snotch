@@ -22,8 +22,6 @@
 	<string></string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Snotch uses your microphone to sync your teleprompter scroll with your voice in real time.</string>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Snotch uses speech recognition to capture your spoken sample and match script style to your natural speaking voice.</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>Snotch needs Accessibility access to respond to global keyboard shortcuts while other apps are in focus.</string>
 	<key>NSScreenCaptureUsageDescription</key>

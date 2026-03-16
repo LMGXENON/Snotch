@@ -24,8 +24,6 @@ final class OverlayWindow: NSWindow {
         level = .statusBar
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         contentView?.wantsLayer = true
-        // Mask the AppKit layer with bottom-only rounded corners (radius 24),
-        // matching the SwiftUI UnevenRoundedRectangle clipShape precisely.
         applyBottomRoundedMask(radius: 24)
         positionNearNotch()
     }
@@ -34,7 +32,6 @@ final class OverlayWindow: NSWindow {
         guard let layer = contentView?.layer else { return }
         layer.cornerRadius = 0
         layer.masksToBounds = true
-        // Use cornerRadius only on the bottom two corners via CALayer's maskedCorners
         layer.cornerRadius = radius
         layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
     }
@@ -330,16 +327,18 @@ struct OverlayPillView: View {
             }
             .clipped()
 
-            // Progress bar — subtle line at the bottom of the notch pill.
+            // Progress bar — fades in when listening
             VStack(spacing: 0) {
                 Spacer()
                 GeometryReader { bar in
                     ZStack(alignment: .leading) {
+                        // Track — full width, flush to pill bottom
                         Rectangle()
-                            .fill(Color(white: isLight ? 0 : 1, opacity: speechManager.isListening ? 0.10 : 0.06))
+                            .fill(Color(white: isLight ? 0 : 1, opacity: 0.10))
                             .frame(height: 3)
+                        // Fill — grows left to right from border
                         Rectangle()
-                            .fill(Color(white: isLight ? 0 : 1, opacity: speechManager.isListening ? 0.60 : 0.22))
+                            .fill(Color(white: isLight ? 0 : 1, opacity: 0.60))
                             .frame(width: max(0, CGFloat(progressFraction) * bar.size.width), height: 3)
                             .animation(.linear(duration: 0.4), value: progressFraction)
                     }
@@ -347,8 +346,8 @@ struct OverlayPillView: View {
                 .frame(height: 3)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .opacity(1)
-            .animation(.easeInOut(duration: 0.25), value: speechManager.isListening)
+            .opacity(speechManager.isListening ? 1 : 0)
+            .animation(.easeInOut(duration: 0.3), value: speechManager.isListening)
 
             // 3-2-1 countdown overlay
             if speechManager.isCountingDown {

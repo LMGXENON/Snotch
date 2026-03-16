@@ -1,3 +1,22 @@
 {
-  "licenses": []
+  "licenses": [
+    {
+      "licenseKey": "SNTCH-DEV-PERM-0001",
+      "licenseHash": "6f72e3b65bdebd6920031690d2f74dc360e0fa35947afdac184598f206e49a38",
+      "status": "active",
+      "devicesAllowed": 999999,
+      "activations": [
+        {
+          "deviceId": "dev-mac-1",
+          "firstSeenAt": "2026-03-16T02:01:43.817Z",
+          "lastSeenAt": "2026-03-16T02:01:43.817Z",
+          "appVersion": "1.0",
+          "platform": "macOS"
+        }
+      ],
+      "createdAt": "2026-03-16T02:01:09.206Z",
+      "updatedAt": "2026-03-16T02:01:09.206Z",
+      "note": "Permanent dev testing key"
+    }
+  ]
 }
