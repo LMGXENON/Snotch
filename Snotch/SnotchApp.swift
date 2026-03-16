@@ -24,6 +24,7 @@ struct SnotchApp: App {
                     LicenseActivationView(licenseManager: licenseManager)
                 } else if onboardingDone {
                     ContentView(
+                        licenseManager: licenseManager,
                         speechManager:     speechManager,
                         overlayController: overlayController
                     )

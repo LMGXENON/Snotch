@@ -302,6 +302,7 @@ final class StyleCaptureRecorder: NSObject, ObservableObject {
 struct ContentView: View {
 
     @StateObject private var store = ScriptStore()
+    @ObservedObject var licenseManager: LicenseManager
     @ObservedObject var speechManager: SpeechManager
     @ObservedObject var overlayController: OverlayWindowController
 
@@ -1198,9 +1199,8 @@ struct ContentView: View {
 
     private func applyGeneratedScriptWithGPT() async -> Bool {
         guard var script = editingScript else { return false }
-        let key = openAIAPIKeyFromEnvironment().trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !key.isEmpty else {
-            generatorErrorMessage = "OPENAI_API_KEY is missing from environment."
+        guard let token = licenseManager.activationSummary()?.token, !token.isEmpty else {
+            generatorErrorMessage = "License token missing. Re-activate your license."
             return false
         }
 
@@ -1294,7 +1294,17 @@ struct ContentView: View {
         """
 
         do {
-            let generated = try await generateScriptWithOpenAI(apiKey: key, prompt: userPrompt)
+            let generated = try await generateScriptWithBackend(
+                token: token,
+                topic: topic,
+                audience: audience.isEmpty ? "General audience" : audience,
+                tone: generatorTone,
+                goal: generatorGoal,
+                styleProfile: generatorEnableStyleMatch ? styleProfile : "",
+                targetMinutes: targetMinutes,
+                useCues: generatorUseCues,
+                promptOverride: userPrompt
+            )
             await MainActor.run {
                 script.title = topic.isEmpty ? script.title : topic
                 script.body = formatScriptForNotch(generated, maxChars: 48)
@@ -1310,47 +1320,57 @@ struct ContentView: View {
         }
     }
 
-    private func generateScriptWithOpenAI(apiKey: String, prompt: String) async throws -> String {
-        let systemPrompt = """
-        You are an expert video speechwriter.
-        Write scripts that sound genuinely human, specific, and natural when spoken out loud.
-        Keep flow smooth, avoid formulaic phrasing, and avoid any mention of being an AI.
-        Follow every user constraint exactly.
-        Output only the script text.
-        """
+    private var backendBaseURL: String {
+        #if DEBUG
+        return "http://localhost:8787"
+        #else
+        return "https://api.snotch.app"
+        #endif
+    }
 
-        let requestBody = OpenAIChatRequest(
-            model: "gpt-4.1-mini",
-            messages: [
-                .init(role: "system", content: systemPrompt),
-                .init(role: "user", content: prompt)
-            ],
-            temperature: 0.75,
-            top_p: 0.95,
-            max_tokens: 1800
+    private func generateScriptWithBackend(
+        token: String,
+        topic: String,
+        audience: String,
+        tone: String,
+        goal: String,
+        styleProfile: String,
+        targetMinutes: Double?,
+        useCues: Bool,
+        promptOverride: String
+    ) async throws -> String {
+        let requestBody = BackendGenerateRequest(
+            topic: topic,
+            audience: audience,
+            tone: tone,
+            goal: goal,
+            styleProfile: styleProfile,
+            targetMinutes: targetMinutes,
+            useCues: useCues,
+            promptOverride: promptOverride
         )
 
-        var request = URLRequest(url: URL(string: "https://api.openai.com/v1/chat/completions")!)
+        var request = URLRequest(url: URL(string: "\(backendBaseURL)/v1/generate/script")!)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONEncoder().encode(requestBody)
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else {
-            throw NSError(domain: "Snotch.Generator", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response from server"])
+            throw NSError(domain: "Snotch.Generator", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response from backend"])
         }
 
         if !(200...299).contains(http.statusCode) {
-            if let err = try? JSONDecoder().decode(OpenAIErrorEnvelope.self, from: data) {
-                throw NSError(domain: "Snotch.Generator", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: err.error.message])
+            if let err = try? JSONDecoder().decode(BackendErrorEnvelope.self, from: data) {
+                throw NSError(domain: "Snotch.Generator", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: err.message])
             }
-            throw NSError(domain: "Snotch.Generator", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: "OpenAI request failed with status \(http.statusCode)"])
+            throw NSError(domain: "Snotch.Generator", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: "Backend request failed with status \(http.statusCode)"])
         }
 
-        let decoded = try JSONDecoder().decode(OpenAIChatResponse.self, from: data)
-        guard let content = decoded.choices.first?.message.content?.trimmingCharacters(in: .whitespacesAndNewlines), !content.isEmpty else {
-            throw NSError(domain: "Snotch.Generator", code: -2, userInfo: [NSLocalizedDescriptionKey: "Empty script returned by model"])
+        let decoded = try JSONDecoder().decode(BackendGenerateResponse.self, from: data)
+        guard decoded.ok, let content = decoded.script?.trimmingCharacters(in: .whitespacesAndNewlines), !content.isEmpty else {
+            throw NSError(domain: "Snotch.Generator", code: -2, userInfo: [NSLocalizedDescriptionKey: decoded.message ?? "Empty script returned by backend"])
         }
         return content
     }
@@ -1414,57 +1434,62 @@ struct ContentView: View {
     }
 
     private func requestStyleCaptureTopic() async -> String {
-        let key = openAIAPIKeyFromEnvironment().trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !key.isEmpty else {
+        guard let token = licenseManager.activationSummary()?.token, !token.isEmpty else {
             return "Talk for 30 seconds about your favorite app and why you use it daily."
         }
-
-        let prompt = """
-        Give one easy speaking prompt for a 30-second personal response.
-        Keep it simple, casual, and broad.
-        Output one sentence only.
-        """
-
         do {
-            return try await generateScriptWithOpenAI(apiKey: key, prompt: prompt)
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+            var request = URLRequest(url: URL(string: "\(backendBaseURL)/v1/generate/bundles")!)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            request.httpBody = try JSONEncoder().encode(BackendBundlesRequest(topic: "Personal speaking practice", audience: "General audience"))
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                throw NSError(domain: "Snotch.Generator", code: -3)
+            }
+            let decoded = try JSONDecoder().decode(BackendBundlesResponse.self, from: data)
+            if decoded.ok, let first = decoded.hooks.first ?? decoded.titles.first {
+                return first.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            return "Talk for 30 seconds about a product you genuinely like and why."
         } catch {
             return "Talk for 30 seconds about a product you genuinely like and why."
         }
     }
 
-    private func openAIAPIKeyFromEnvironment() -> String {
-        ProcessInfo.processInfo.environment["OPENAI_API_KEY"] ?? ""
+    private struct BackendGenerateRequest: Encodable {
+        let topic: String
+        let audience: String
+        let tone: String
+        let goal: String
+        let styleProfile: String
+        let targetMinutes: Double?
+        let useCues: Bool
+        let promptOverride: String
     }
 
-    private struct OpenAIChatRequest: Encodable {
-        struct Message: Encodable {
-            let role: String
-            let content: String
-        }
-        let model: String
-        let messages: [Message]
-        let temperature: Double
-        let top_p: Double
-        let max_tokens: Int
+    private struct BackendGenerateResponse: Decodable {
+        let ok: Bool
+        let script: String?
+        let message: String?
     }
 
-    private struct OpenAIChatResponse: Decodable {
-        struct Choice: Decodable {
-            struct Message: Decodable {
-                let role: String?
-                let content: String?
-            }
-            let message: Message
-        }
-        let choices: [Choice]
+    private struct BackendBundlesRequest: Encodable {
+        let topic: String
+        let audience: String
     }
 
-    private struct OpenAIErrorEnvelope: Decodable {
-        struct ErrorBody: Decodable {
-            let message: String
-        }
-        let error: ErrorBody
+    private struct BackendBundlesResponse: Decodable {
+        let ok: Bool
+        let titles: [String]
+        let hooks: [String]
+        let ctas: [String]
+    }
+
+    private struct BackendErrorEnvelope: Decodable {
+        let ok: Bool?
+        let message: String
     }
 
     // MARK: - Helpers
