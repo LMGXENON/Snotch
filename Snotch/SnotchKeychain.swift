@@ -3,6 +3,10 @@ import Security
 
 enum SnotchKeychain {
     static func save(service: String, account: String, value: String) {
+        #if DEBUG
+        UserDefaults.standard.set(value, forKey: "\(service).\(account)")
+        return
+        #else
         guard let data = value.data(using: .utf8) else { return }
 
         let query: [String: Any] = [
@@ -22,9 +26,13 @@ enum SnotchKeychain {
         ]
 
         SecItemAdd(addQuery as CFDictionary, nil)
+        #endif
     }
 
     static func load(service: String, account: String) -> String? {
+        #if DEBUG
+        return UserDefaults.standard.string(forKey: "\(service).\(account)")
+        #else
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -41,14 +49,20 @@ enum SnotchKeychain {
             return nil
         }
         return value
+        #endif
     }
 
     static func delete(service: String, account: String) {
+        #if DEBUG
+        UserDefaults.standard.removeObject(forKey: "\(service).\(account)")
+        return
+        #else
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account
         ]
         SecItemDelete(query as CFDictionary)
+        #endif
     }
 }

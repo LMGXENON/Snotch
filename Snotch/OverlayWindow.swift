@@ -330,16 +330,16 @@ struct OverlayPillView: View {
             }
             .clipped()
 
-            // Progress bar — subtle line at the bottom of the notch pill.
+            // Progress bar — fades in when voice activity is detected.
             VStack(spacing: 0) {
                 Spacer()
                 GeometryReader { bar in
                     ZStack(alignment: .leading) {
                         Rectangle()
-                            .fill(Color(white: isLight ? 0 : 1, opacity: speechManager.isListening ? 0.10 : 0.06))
+                            .fill(Color(white: isLight ? 0 : 1, opacity: 0.10))
                             .frame(height: 3)
                         Rectangle()
-                            .fill(Color(white: isLight ? 0 : 1, opacity: speechManager.isListening ? 0.60 : 0.22))
+                            .fill(Color(white: isLight ? 0 : 1, opacity: 0.60))
                             .frame(width: max(0, CGFloat(progressFraction) * bar.size.width), height: 3)
                             .animation(.linear(duration: 0.4), value: progressFraction)
                     }
@@ -347,8 +347,8 @@ struct OverlayPillView: View {
                 .frame(height: 3)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .opacity(1)
-            .animation(.easeInOut(duration: 0.25), value: speechManager.isListening)
+            .opacity(speechManager.isVoiceActive ? 1 : 0)
+            .animation(.easeInOut(duration: 0.3), value: speechManager.isVoiceActive)
 
             // 3-2-1 countdown overlay
             if speechManager.isCountingDown {

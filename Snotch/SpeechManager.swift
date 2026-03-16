@@ -15,6 +15,7 @@ final class SpeechManager: NSObject, ObservableObject {
     @Published var scrollSpeed:      Double = 1.0
     @Published var isPaused:         Bool   = false
     @Published var audioLevel:       Float  = 0
+    @Published var isVoiceActive:    Bool   = false
     @Published var countdownValue:   Int    = 0
     @Published var isCountingDown:   Bool   = false
     @Published var fillerFlash:      Bool   = false
@@ -34,7 +35,7 @@ final class SpeechManager: NSObject, ObservableObject {
     private var avgWordsPerLine: Double = 8.0
     private var speedMultiplier: Double = 1.0
     private var holdUntil:      Date?
-    private var wordsAdvancedSession: Double = 0
+    private var linesAdvancedSession: Int = 0
     private var sessionStart:   Date?
     private var activeScriptID: UUID?
     private var cueBreaks:       Set<Int> = []
@@ -44,9 +45,12 @@ final class SpeechManager: NSObject, ObservableObject {
     private var focusLines:      Set<Int> = []
     private var holdLines:       [Int: TimeInterval] = [:]
     private var fillerTriggeredOnLine: Set<Int> = []
+    private var pendingStartAfterPermission: Bool = false
+    private var noiseFloorRMS:  Float = 0.0008
+    private var warmupUntil: Date?
 
     // How loud the mic needs to be to count as voice (0.0–1.0 RMS)
-    private let rmsThreshold:   Float        = 0.01
+    private let rmsThreshold:   Float        = 0.00008
     // Baseline silence timeout, adjusted dynamically with RMS for breath-aware pausing
     private let silenceTimeout: TimeInterval = 0.4
 
@@ -121,7 +125,10 @@ final class SpeechManager: NSObject, ObservableObject {
         let totalWords = lines.reduce(0) { $0 + $1.split(separator: " ").count }
         if !lines.isEmpty { avgWordsPerLine = max(1.0, Double(totalWords) / Double(lines.count)) }
         lineAccum = 0
-        DispatchQueue.main.async { self.currentLineIndex = 0 }
+        DispatchQueue.main.async {
+            self.currentLineIndex = 0
+            self.isVoiceActive = false
+        }
     }
 
     private func wrapForNotch(_ text: String, maxChars: Int) -> [String] {
@@ -147,24 +154,8 @@ final class SpeechManager: NSObject, ObservableObject {
 
     private func wordsInLine(at index: Int) -> Int {
         guard scriptLines.indices.contains(index) else { return 1 }
-        let rawTokens = scriptLines[index].split(whereSeparator: \.isWhitespace)
-        guard !rawTokens.isEmpty else { return 1 }
-
-        var units = 0
-        for raw in rawTokens {
-            let token = raw.filter { $0.isLetter || $0.isNumber }
-            guard !token.isEmpty else { continue }
-
-            let hasLetter = token.contains { $0.isLetter }
-            let hasDigit = token.contains { $0.isNumber }
-            if hasLetter && hasDigit {
-                // Treat mixed tokens like W223 as spoken character-by-character (W 2 2 3).
-                units += token.count
-            } else {
-                units += 1
-            }
-        }
-        return max(1, units)
+        let tokens = scriptLines[index].split(whereSeparator: \.isWhitespace)
+        return max(1, tokens.count)
     }
 
     private func bestSplitIndex(in text: String, preferredMax: Int, hardMax: Int) -> String.Index {
@@ -201,19 +192,33 @@ final class SpeechManager: NSObject, ObservableObject {
     func startListening() {
         guard !isListening else { return }
         micAuthStatus = AVCaptureDevice.authorizationStatus(for: .audio)
-        guard micAuthStatus == .authorized else { requestPermissions(); return }
+        guard micAuthStatus == .authorized else {
+            pendingStartAfterPermission = true
+            requestPermissions()
+            return
+        }
+        pendingStartAfterPermission = false
 
         sessionStart = Date()
-        wordsAdvancedSession = 0
+        linesAdvancedSession = 0
         fillerCountSession = 0
         fillerHeatmap = ["Intro": 0, "Body": 0, "Outro": 0]
+        noiseFloorRMS = 0.0008
+        warmupUntil = Date().addingTimeInterval(0.7)
+        voiceActive = false
+        isVoiceActive = false
 
         audioEngine = AVAudioEngine()
         let inputNode = audioEngine.inputNode
-        let format    = inputNode.outputFormat(forBus: 0)
+        inputNode.removeTap(onBus: 0)
 
-        inputNode.installTap(onBus: 0, bufferSize: 4096, format: format) { [weak self] buffer, _ in
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: nil) { [weak self] buffer, _ in
             self?.processBuffer(buffer)
+        }
+
+        // Prime the meter so UI reacts immediately when listening starts.
+        DispatchQueue.main.async {
+            self.audioLevel = 0
         }
 
         do {
@@ -226,9 +231,11 @@ final class SpeechManager: NSObject, ObservableObject {
     }
 
     func stopListening() {
+        pendingStartAfterPermission = false
         scrollTimer?.invalidate();  scrollTimer  = nil
         silenceTimer?.invalidate(); silenceTimer = nil
         voiceActive = false
+        isVoiceActive = false
         // lineAccum intentionally preserved — resume will continue mid-line
         if audioEngine.isRunning { audioEngine.stop() }
         audioEngine.inputNode.removeTap(onBus: 0)
@@ -248,7 +255,11 @@ final class SpeechManager: NSObject, ObservableObject {
     }
 
     private func beginCountdown() {
-        guard micAuthStatus == .authorized else { requestPermissions(); return }
+        guard micAuthStatus == .authorized else {
+            pendingStartAfterPermission = true
+            requestPermissions()
+            return
+        }
         countdownValue = 3
         isCountingDown = true
         countdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] t in
@@ -302,20 +313,143 @@ final class SpeechManager: NSObject, ObservableObject {
     // MARK: - Audio / VAD
 
     private func processBuffer(_ buffer: AVAudioPCMBuffer) {
-        guard let data = buffer.floatChannelData?[0] else { return }
         let count = Int(buffer.frameLength)
         guard count > 0 else { return }
 
-        var sum: Float = 0
-        for i in 0..<count { sum += data[i] * data[i] }
-        let rms = sqrtf(sum / Float(count))
+        let (rms, _) = meterValues(from: buffer, frameCount: count)
+        let boosted = min(rms * 24.0, 1.0)
 
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             // Exponential smoothing — decays naturally to 0 when silent
-            self.audioLevel = 0.35 * rms + 0.65 * self.audioLevel
-            if rms > self.rmsThreshold { self.handleVoiceBurst(rms: rms) }
+            self.audioLevel = 0.45 * boosted + 0.55 * self.audioLevel
+
+            if !self.voiceActive,
+               let warmupUntil = self.warmupUntil,
+               Date() > warmupUntil {
+                self.noiseFloorRMS = 0.988 * self.noiseFloorRMS + 0.012 * rms
+            }
+
+            let adaptive = max(self.rmsThreshold, min(0.0020, self.noiseFloorRMS * 1.12 + 0.000025))
+            if rms > adaptive || self.audioLevel > 0.015 {
+                self.handleVoiceBurst(rms: max(rms, adaptive))
+            }
         }
+    }
+
+    private func meterValues(from buffer: AVAudioPCMBuffer, frameCount: Int) -> (Float, Float) {
+        if let channels = buffer.floatChannelData {
+            let channelCount = Int(buffer.format.channelCount)
+            var sum: Float = 0
+            var peak: Float = 0
+            var samples = 0
+            for ch in 0..<max(1, channelCount) {
+                let data = channels[ch]
+                for i in 0..<frameCount {
+                    let v = data[i]
+                    sum += v * v
+                    let av = abs(v)
+                    if av > peak { peak = av }
+                    samples += 1
+                }
+            }
+            let rms = samples > 0 ? sqrtf(sum / Float(samples)) : 0
+            return (rms, peak)
+        }
+
+        if let channels = buffer.int16ChannelData {
+            let channelCount = Int(buffer.format.channelCount)
+            var sum: Float = 0
+            var peak: Float = 0
+            var samples = 0
+            let scale: Float = 1.0 / Float(Int16.max)
+            for ch in 0..<max(1, channelCount) {
+                let data = channels[ch]
+                for i in 0..<frameCount {
+                    let v = Float(data[i]) * scale
+                    sum += v * v
+                    let av = abs(v)
+                    if av > peak { peak = av }
+                    samples += 1
+                }
+            }
+            let rms = samples > 0 ? sqrtf(sum / Float(samples)) : 0
+            return (rms, peak)
+        }
+
+        if let channels = buffer.int32ChannelData {
+            let channelCount = Int(buffer.format.channelCount)
+            var sum: Float = 0
+            var peak: Float = 0
+            var samples = 0
+            let scale: Float = 1.0 / Float(Int32.max)
+            for ch in 0..<max(1, channelCount) {
+                let data = channels[ch]
+                for i in 0..<frameCount {
+                    let v = Float(data[i]) * scale
+                    sum += v * v
+                    let av = abs(v)
+                    if av > peak { peak = av }
+                    samples += 1
+                }
+            }
+            let rms = samples > 0 ? sqrtf(sum / Float(samples)) : 0
+            return (rms, peak)
+        }
+
+        let abl = UnsafeMutableAudioBufferListPointer(buffer.mutableAudioBufferList)
+        var sum: Float = 0
+        var peak: Float = 0
+        var samples = 0
+
+        switch buffer.format.commonFormat {
+        case .pcmFormatFloat32:
+            for audioBuffer in abl {
+                guard let mData = audioBuffer.mData else { continue }
+                let sampleCount = Int(audioBuffer.mDataByteSize) / MemoryLayout<Float>.size
+                let ptr = mData.assumingMemoryBound(to: Float.self)
+                for i in 0..<sampleCount {
+                    let v = ptr[i]
+                    sum += v * v
+                    let av = abs(v)
+                    if av > peak { peak = av }
+                    samples += 1
+                }
+            }
+        case .pcmFormatInt16:
+            let scale: Float = 1.0 / Float(Int16.max)
+            for audioBuffer in abl {
+                guard let mData = audioBuffer.mData else { continue }
+                let sampleCount = Int(audioBuffer.mDataByteSize) / MemoryLayout<Int16>.size
+                let ptr = mData.assumingMemoryBound(to: Int16.self)
+                for i in 0..<sampleCount {
+                    let v = Float(ptr[i]) * scale
+                    sum += v * v
+                    let av = abs(v)
+                    if av > peak { peak = av }
+                    samples += 1
+                }
+            }
+        case .pcmFormatInt32:
+            let scale: Float = 1.0 / Float(Int32.max)
+            for audioBuffer in abl {
+                guard let mData = audioBuffer.mData else { continue }
+                let sampleCount = Int(audioBuffer.mDataByteSize) / MemoryLayout<Int32>.size
+                let ptr = mData.assumingMemoryBound(to: Int32.self)
+                for i in 0..<sampleCount {
+                    let v = Float(ptr[i]) * scale
+                    sum += v * v
+                    let av = abs(v)
+                    if av > peak { peak = av }
+                    samples += 1
+                }
+            }
+        default:
+            break
+        }
+
+        let rms = samples > 0 ? sqrtf(sum / Float(samples)) : 0
+        return (rms, peak)
     }
 
     private func handleVoiceBurst(rms: Float) {
@@ -325,12 +459,20 @@ final class SpeechManager: NSObject, ObservableObject {
         silenceTimer = Timer.scheduledTimer(withTimeInterval: dynamicSilence, repeats: false) { [weak self] _ in
             guard let self else { return }
             self.voiceActive = false
+            DispatchQueue.main.async { self.isVoiceActive = false }
             self.scrollTimer?.invalidate()
             self.scrollTimer = nil
         }
 
-        guard !voiceActive else { return }   // already scrolling
+        if voiceActive {
+            if scrollTimer == nil && !isPaused && !scriptLines.isEmpty {
+                startScrollTimer()
+            }
+            return
+        }
+
         voiceActive = true
+        DispatchQueue.main.async { self.isVoiceActive = true }
         if pauseForCue {
             pauseForCue = false
             consumedBreaks.insert(currentLineIndex)
@@ -345,7 +487,11 @@ final class SpeechManager: NSObject, ObservableObject {
         // Do NOT reset lineAccum — preserves partial progress through the current line
         // so resuming mid-sentence doesn't require re-reading from the line start.
 
-        // Tick at 20 Hz using per-line word counts to keep pace stable across varying line lengths.
+        startScrollTimer()
+    }
+
+    private func startScrollTimer() {
+        // Tick at 20 Hz while voice is active.
         scrollTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
             guard let self, !self.isPaused, !self.scriptLines.isEmpty else { return }
             if let holdUntil, Date() < holdUntil {
@@ -361,13 +507,14 @@ final class SpeechManager: NSObject, ObservableObject {
                     self.lineAccum = 0
                     self.pauseForCue = true
                     self.voiceActive = false
+                    DispatchQueue.main.async { self.isVoiceActive = false }
                     self.scrollTimer?.invalidate()
                     self.scrollTimer = nil
                     return
                 }
                 self.lineAccum -= 1.0
-                self.wordsAdvancedSession += currentWords
                 self.currentLineIndex = min(self.currentLineIndex + 1, self.scriptLines.count - 1)
+                self.linesAdvancedSession += 1
                 self.applyDirectives(for: self.currentLineIndex)
             }
         }
@@ -406,8 +553,8 @@ final class SpeechManager: NSObject, ObservableObject {
     private func dynamicSilenceTimeout(rms: Float) -> TimeInterval {
         let clamped = max(rmsThreshold, min(0.045, rms))
         let norm = Double((clamped - rmsThreshold) / (0.045 - rmsThreshold))
-        // Stronger voice -> slightly longer timeout to tolerate breathing between phrases.
-        return max(0.28, min(0.70, silenceTimeout + norm * 0.24))
+        // Keep stop behavior snappy after speaking ends.
+        return max(0.16, min(0.42, silenceTimeout * 0.38 + norm * 0.12))
     }
 
     private func incrementHeatmapSection(for index: Int) {
@@ -467,12 +614,25 @@ final class SpeechManager: NSObject, ObservableObject {
     func requestPermissions() {
         let status = AVCaptureDevice.authorizationStatus(for: .audio)
         guard status == .notDetermined else {
-            DispatchQueue.main.async { self.micAuthStatus = status }
+            DispatchQueue.main.async {
+                self.micAuthStatus = status
+                if status == .authorized, self.pendingStartAfterPermission {
+                    self.pendingStartAfterPermission = false
+                    self.beginCountdown()
+                } else if status == .denied || status == .restricted {
+                    self.pendingStartAfterPermission = false
+                }
+            }
             return
         }
         AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
             DispatchQueue.main.async {
-                self?.micAuthStatus = granted ? .authorized : .denied
+                guard let self else { return }
+                self.micAuthStatus = granted ? .authorized : .denied
+                if granted, self.pendingStartAfterPermission {
+                    self.pendingStartAfterPermission = false
+                    self.beginCountdown()
+                }
             }
         }
     }

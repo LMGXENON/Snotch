@@ -28,10 +28,6 @@
 	<string>Snotch needs Accessibility access to respond to global keyboard shortcuts while other apps are in focus.</string>
 	<key>NSScreenCaptureUsageDescription</key>
 	<string>Snotch requests screen capture permission to allow precise overlay positioning detection.</string>
-	<key>com.apple.security.app-sandbox</key>
-	<false/>
-	<key>com.apple.security.device.microphone</key>
-	<true/>
 	<key>LSUIElement</key>
 	<false/>
 	<key>NSHumanReadableCopyright</key>

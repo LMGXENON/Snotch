@@ -35,6 +35,15 @@ export function findLicenseByHash(hash) {
   return db.licenses.find((l) => l.licenseHash === hash) || null;
 }
 
+export function findLicense({ licenseHash, licenseKey }) {
+  const db = readDB();
+  return db.licenses.find((l) => {
+    if (licenseHash && l.licenseHash === licenseHash) return true;
+    if (licenseKey && l.licenseKey === licenseKey) return true;
+    return false;
+  }) || null;
+}
+
 export function upsertLicense(license) {
   const db = readDB();
   const idx = db.licenses.findIndex((l) => l.licenseHash === license.licenseHash);

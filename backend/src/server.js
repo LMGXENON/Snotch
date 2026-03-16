@@ -1,13 +1,17 @@
 import "dotenv/config";
 import crypto from "node:crypto";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import jwt from "jsonwebtoken";
-import { findLicenseByHash, updateLicense, listLicenses } from "./store.js";
+import { findLicense, updateLicense, listLicenses, upsertLicense } from "./store.js";
 
 const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const PORT = Number(process.env.PORT || 8787);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
@@ -22,9 +26,27 @@ if (!JWT_SECRET || !LICENSE_PEPPER) {
   console.warn("WARNING: JWT_SECRET or LICENSE_PEPPER missing. Set them in environment.");
 }
 
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      baseUri: ["'self'"],
+      fontSrc: ["'self'", "https:", "data:"],
+      formAction: ["'self'"],
+      frameAncestors: ["'self'"],
+      imgSrc: ["'self'", "data:"],
+      objectSrc: ["'none'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrcAttr: ["'none'"],
+      styleSrc: ["'self'", "https:", "'unsafe-inline'"],
+      connectSrc: ["'self'"],
+      upgradeInsecureRequests: null,
+    },
+  },
+}));
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
+app.use(express.static(path.resolve(__dirname, "../public")));
 
 function isAdminRequest(req) {
   if (!ADMIN_API_KEY) return false;
@@ -111,18 +133,62 @@ function requireAuth(req, res, next) {
   }
 }
 
+function requireAdmin(req, res, next) {
+  if (!req.isAdmin) {
+    return res.status(401).json({ ok: false, message: "Unauthorized" });
+  }
+  return next();
+}
+
+function randomKeyBlock(len = 4) {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let out = "";
+  for (let i = 0; i < len; i += 1) {
+    out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return out;
+}
+
+function normalizePrefix(prefix = "SNTCH") {
+  return String(prefix)
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 10) || "SNTCH";
+}
+
+function makeLicenseKey(prefix = "SNTCH") {
+  const p = normalizePrefix(prefix);
+  return `${p}-${randomKeyBlock(4)}-${randomKeyBlock(4)}-${randomKeyBlock(4)}`;
+}
+
 app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "snotch-backend", time: nowISO() });
 });
 
+app.get("/admin", (_req, res) => {
+  res.sendFile(path.resolve(__dirname, "../public/admin.html"));
+});
+
+app.post("/v1/admin/auth", validateLimiter, (req, res) => {
+  const adminKey = String(req.body?.adminKey || "").trim();
+  if (!ADMIN_API_KEY) {
+    return res.status(500).json({ ok: false, message: "Admin key is not configured on server" });
+  }
+  if (!adminKey || adminKey !== ADMIN_API_KEY) {
+    return res.status(401).json({ ok: false, message: "Invalid admin key" });
+  }
+  return res.json({ ok: true, message: "Admin authenticated" });
+});
+
 app.post("/v1/license/activate", activationLimiter, (req, res) => {
-  const { licenseKey, deviceId, appVersion, platform } = req.body || {};
+  const { licenseKey, deviceId, deviceName, appVersion, platform } = req.body || {};
   if (!licenseKey || !deviceId || !appVersion || !platform) {
     return res.status(400).json({ ok: false, message: "Missing required fields" });
   }
 
-  const licenseHash = hashLicenseKey(String(licenseKey).trim());
-  const license = findLicenseByHash(licenseHash);
+  const normalizedLicenseKey = String(licenseKey).trim();
+  const licenseHash = hashLicenseKey(normalizedLicenseKey);
+  const license = findLicense({ licenseHash, licenseKey: normalizedLicenseKey });
   if (!license || license.status !== "active") {
     if (req.isAdmin && ADMIN_BYPASS_UNLIMITED) {
       const token = issueToken({
@@ -155,10 +221,26 @@ app.post("/v1/license/activate", activationLimiter, (req, res) => {
   const nextActivations = existing
     ? activations.map((a) =>
         a.deviceId === deviceId
-          ? { ...a, lastSeenAt: nowISO(), appVersion, platform }
+          ? {
+              ...a,
+              deviceName: deviceName ? String(deviceName).trim().slice(0, 120) : (a.deviceName || ""),
+              lastSeenAt: nowISO(),
+              appVersion,
+              platform,
+            }
           : a
       )
-    : [...activations, { deviceId, firstSeenAt: nowISO(), lastSeenAt: nowISO(), appVersion, platform }];
+    : [
+        ...activations,
+        {
+          deviceId,
+          deviceName: deviceName ? String(deviceName).trim().slice(0, 120) : "",
+          firstSeenAt: nowISO(),
+          lastSeenAt: nowISO(),
+          appVersion,
+          platform,
+        },
+      ];
 
   updateLicense(licenseHash, (prev) => ({ ...prev, activations: nextActivations }));
 
@@ -179,7 +261,7 @@ app.post("/v1/license/activate", activationLimiter, (req, res) => {
 });
 
 app.post("/v1/license/validate", validateLimiter, (req, res) => {
-  const { token, licenseKey, deviceId, appVersion, platform } = req.body || {};
+  const { token, licenseKey, deviceId, deviceName, appVersion, platform } = req.body || {};
   if (!token || !licenseKey || !deviceId || !appVersion || !platform) {
     return res.status(400).json({ ok: false, message: "Missing required fields" });
   }
@@ -195,12 +277,13 @@ app.post("/v1/license/validate", validateLimiter, (req, res) => {
     return res.status(401).json({ ok: false, message: "Token expired or invalid" });
   }
 
-  const licenseHash = hashLicenseKey(String(licenseKey).trim());
+  const normalizedLicenseKey = String(licenseKey).trim();
+  const licenseHash = hashLicenseKey(normalizedLicenseKey);
   if (payload.licenseHash !== licenseHash || payload.deviceId !== deviceId) {
     return res.status(403).json({ ok: false, message: "Token mismatch" });
   }
 
-  const license = findLicenseByHash(licenseHash);
+  const license = findLicense({ licenseHash, licenseKey: normalizedLicenseKey });
   if (!license || license.status !== "active") {
     return res.status(403).json({ ok: false, message: "License invalid" });
   }
@@ -214,7 +297,15 @@ app.post("/v1/license/validate", validateLimiter, (req, res) => {
   updateLicense(licenseHash, (prev) => ({
     ...prev,
     activations: prev.activations.map((a) =>
-      a.deviceId === deviceId ? { ...a, lastSeenAt: nowISO(), appVersion, platform } : a
+      a.deviceId === deviceId
+        ? {
+            ...a,
+            deviceName: deviceName ? String(deviceName).trim().slice(0, 120) : (a.deviceName || ""),
+            lastSeenAt: nowISO(),
+            appVersion,
+            platform,
+          }
+        : a
     ),
   }));
 
@@ -238,6 +329,7 @@ app.post("/v1/generate/script", generateLimiter, requireAuth, async (req, res) =
     styleProfile = "",
     targetMinutes = null,
     useCues = false,
+    promptOverride = "",
   } = req.body || {};
 
   if (!topic || String(topic).trim().length < 2) {
@@ -257,18 +349,20 @@ app.post("/v1/generate/script", generateLimiter, requireAuth, async (req, res) =
     ? `Match this speaking style naturally:\n${String(styleProfile).trim()}`
     : "No extra style profile provided.";
 
-  const userPrompt = [
-    `Topic: ${topic}`,
-    `Audience: ${audience}`,
-    `Tone: ${tone}`,
-    `Goal: ${goal}`,
-    lengthRule,
-    styleRule,
-    cueRule,
-    "Output only spoken script text.",
-    "No markdown. No bullets. No meta labels.",
-    "Use original wording and natural human cadence.",
-  ].join("\n\n");
+  const userPrompt = String(promptOverride).trim().length > 0
+    ? String(promptOverride).trim()
+    : [
+        `Topic: ${topic}`,
+        `Audience: ${audience}`,
+        `Tone: ${tone}`,
+        `Goal: ${goal}`,
+        lengthRule,
+        styleRule,
+        cueRule,
+        "Output only spoken script text.",
+        "No markdown. No bullets. No meta labels.",
+        "Use original wording and natural human cadence.",
+      ].join("\n\n");
 
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -367,11 +461,139 @@ No markdown.
   }
 });
 
-app.get("/v1/admin/licenses", (req, res) => {
-  if (!req.isAdmin) {
-    return res.status(401).json({ ok: false, message: "Unauthorized" });
+app.get("/v1/admin/licenses", requireAdmin, (req, res) => {
+  const status = String(req.query.status || "").trim().toLowerCase();
+  const q = String(req.query.q || "").trim().toLowerCase();
+  const raw = listLicenses();
+  const filtered = raw.filter((l) => {
+    if (status && String(l.status || "").toLowerCase() !== status) return false;
+    if (q) {
+      const haystack = [l.licenseKey, l.licenseHash, l.note, l.status]
+        .map((v) => String(v || "").toLowerCase())
+        .join(" ");
+      if (!haystack.includes(q)) return false;
+    }
+    return true;
+  });
+
+  return res.json({
+    ok: true,
+    count: filtered.length,
+    licenses: filtered,
+  });
+});
+
+app.post("/v1/admin/licenses/create", validateLimiter, requireAdmin, (req, res) => {
+  const {
+    prefix = "SNTCH",
+    licenseKey = "",
+    devicesAllowed = 2,
+    note = "",
+  } = req.body || {};
+
+  const normalizedDevices = Math.max(1, Math.min(999999, Number(devicesAllowed) || 2));
+  const normalizedNote = String(note || "").trim().slice(0, 300);
+
+  let finalKey = String(licenseKey || "").trim().toUpperCase();
+  if (!finalKey) {
+    let attempt = 0;
+    while (attempt < 25) {
+      const candidate = makeLicenseKey(prefix);
+      if (!findLicense({ licenseKey: candidate })) {
+        finalKey = candidate;
+        break;
+      }
+      attempt += 1;
+    }
+    if (!finalKey) {
+      return res.status(500).json({ ok: false, message: "Unable to allocate unique license key" });
+    }
+  } else if (findLicense({ licenseKey: finalKey })) {
+    return res.status(409).json({ ok: false, message: "License key already exists" });
   }
-  return res.json({ ok: true, licenses: listLicenses() });
+
+  const licenseHash = hashLicenseKey(finalKey);
+  const now = nowISO();
+  const license = {
+    licenseKey: finalKey,
+    licenseHash,
+    status: "active",
+    devicesAllowed: normalizedDevices,
+    activations: [],
+    createdAt: now,
+    updatedAt: now,
+    note: normalizedNote,
+  };
+
+  upsertLicense(license);
+  return res.json({ ok: true, message: "License created", license });
+});
+
+app.post("/v1/admin/licenses/revoke", validateLimiter, requireAdmin, (req, res) => {
+  const { licenseKey = "", licenseHash = "", reason = "" } = req.body || {};
+  const found = findLicense({
+    licenseKey: String(licenseKey || "").trim().toUpperCase(),
+    licenseHash: String(licenseHash || "").trim(),
+  });
+  if (!found) {
+    return res.status(404).json({ ok: false, message: "License not found" });
+  }
+
+  const updated = updateLicense(found.licenseHash, (prev) => ({
+    ...prev,
+    status: "revoked",
+    revokedAt: nowISO(),
+    revokeReason: String(reason || "").trim().slice(0, 300),
+    updatedAt: nowISO(),
+  }));
+
+  return res.json({ ok: true, message: "License revoked", license: updated });
+});
+
+app.post("/v1/admin/licenses/reactivate", validateLimiter, requireAdmin, (req, res) => {
+  const { licenseKey = "", licenseHash = "" } = req.body || {};
+  const found = findLicense({
+    licenseKey: String(licenseKey || "").trim().toUpperCase(),
+    licenseHash: String(licenseHash || "").trim(),
+  });
+  if (!found) {
+    return res.status(404).json({ ok: false, message: "License not found" });
+  }
+
+  const updated = updateLicense(found.licenseHash, (prev) => {
+    const next = {
+      ...prev,
+      status: "active",
+      updatedAt: nowISO(),
+    };
+    delete next.revokedAt;
+    delete next.revokeReason;
+    return next;
+  });
+
+  return res.json({ ok: true, message: "License reactivated", license: updated });
+});
+
+app.post("/v1/admin/licenses/update", validateLimiter, requireAdmin, (req, res) => {
+  const { licenseKey = "", licenseHash = "", devicesAllowed, note } = req.body || {};
+  const found = findLicense({
+    licenseKey: String(licenseKey || "").trim().toUpperCase(),
+    licenseHash: String(licenseHash || "").trim(),
+  });
+  if (!found) {
+    return res.status(404).json({ ok: false, message: "License not found" });
+  }
+
+  const updated = updateLicense(found.licenseHash, (prev) => ({
+    ...prev,
+    devicesAllowed: devicesAllowed == null
+      ? prev.devicesAllowed
+      : Math.max(1, Math.min(999999, Number(devicesAllowed) || prev.devicesAllowed || 2)),
+    note: note == null ? prev.note : String(note).trim().slice(0, 300),
+    updatedAt: nowISO(),
+  }));
+
+  return res.json({ ok: true, message: "License updated", license: updated });
 });
 
 app.listen(PORT, () => {

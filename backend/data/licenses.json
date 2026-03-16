@@ -1,3 +1,90 @@
 {
-  "licenses": []
+  "licenses": [
+    {
+      "licenseKey": "SNTCH-DEV-PERM-0001",
+      "licenseHash": "6f72e3b65bdebd6920031690d2f74dc360e0fa35947afdac184598f206e49a38",
+      "status": "active",
+      "devicesAllowed": 999999,
+      "activations": [
+        {
+          "deviceId": "dev-mac-1",
+          "firstSeenAt": "2026-03-16T02:01:43.817Z",
+          "lastSeenAt": "2026-03-16T02:01:43.817Z",
+          "appVersion": "1.0",
+          "platform": "macOS"
+        },
+        {
+          "deviceId": "dev-smoke-1",
+          "firstSeenAt": "2026-03-16T02:24:06.952Z",
+          "lastSeenAt": "2026-03-16T02:24:06.952Z",
+          "appVersion": "1.0",
+          "platform": "macOS"
+        },
+        {
+          "deviceId": "E3A3F05A-EF71-490F-A2D5-60F535629E52",
+          "firstSeenAt": "2026-03-16T02:27:43.467Z",
+          "lastSeenAt": "2026-03-16T02:27:43.467Z",
+          "appVersion": "1.0",
+          "platform": "macOS"
+        },
+        {
+          "deviceId": "91EB723A-8DDC-447D-8CD2-2EC335B0CBBD",
+          "firstSeenAt": "2026-03-16T02:31:51.183Z",
+          "lastSeenAt": "2026-03-16T02:31:51.183Z",
+          "appVersion": "1.0",
+          "platform": "macOS"
+        },
+        {
+          "deviceId": "dev-name-smoke",
+          "deviceName": "Waleeds-Air",
+          "firstSeenAt": "2026-03-16T10:25:42.434Z",
+          "lastSeenAt": "2026-03-16T10:25:42.434Z",
+          "appVersion": "1.0",
+          "platform": "macOS"
+        }
+      ],
+      "createdAt": "2026-03-16T02:01:09.206Z",
+      "updatedAt": "2026-03-16T02:01:09.206Z",
+      "note": "Permanent dev testing key"
+    },
+    {
+      "licenseKey": "SNTCH-XS9H-YSCP-BE7F",
+      "licenseHash": "5f84ba43f1d799a0acc1b719111f86b3a7d863c84dce7f845cbca4cb5a018838",
+      "status": "active",
+      "devicesAllowed": 1,
+      "activations": [],
+      "createdAt": "2026-03-16T10:16:27.077Z",
+      "updatedAt": "2026-03-16T10:27:37.430Z",
+      "note": "updated from smoke"
+    },
+    {
+      "licenseKey": "SNTCH-G3ZD-FNCA-Z45Q",
+      "licenseHash": "fcd28adab29d3fa7f1399b7693dbfd66ba391afd59272ab5e36d419511bc4a24",
+      "status": "active",
+      "devicesAllowed": 1,
+      "activations": [
+        {
+          "deviceId": "447D8929-B0E7-4725-8479-C3AD0D265231",
+          "deviceName": "Waleed’s MacBook Air",
+          "firstSeenAt": "2026-03-16T10:34:42.298Z",
+          "lastSeenAt": "2026-03-16T10:34:42.299Z",
+          "appVersion": "1.0",
+          "platform": "macOS"
+        }
+      ],
+      "createdAt": "2026-03-16T10:22:20.734Z",
+      "updatedAt": "2026-03-16T10:27:37.899Z",
+      "note": ""
+    },
+    {
+      "licenseKey": "SNTCH-BQGM-FAKP-DBNR",
+      "licenseHash": "d04ed6642172fe873ec5dbc7e377d0bdd820e9edd68487e26c6f139e1cbf9e9f",
+      "status": "active",
+      "devicesAllowed": 2,
+      "activations": [],
+      "createdAt": "2026-03-16T10:22:44.480Z",
+      "updatedAt": "2026-03-16T10:27:38.669Z",
+      "note": "ui-csp-fix-smoke"
+    }
+  ]
 }

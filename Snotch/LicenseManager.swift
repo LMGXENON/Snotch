@@ -38,6 +38,7 @@ final class LicenseManager: ObservableObject {
     struct ActivateRequest: Encodable {
         let licenseKey: String
         let deviceId: String
+        let deviceName: String
         let appVersion: String
         let platform: String
     }
@@ -46,6 +47,7 @@ final class LicenseManager: ObservableObject {
         let token: String
         let licenseKey: String
         let deviceId: String
+        let deviceName: String
         let appVersion: String
         let platform: String
     }
@@ -128,6 +130,7 @@ final class LicenseManager: ObservableObject {
         let requestPayload = ActivateRequest(
             licenseKey: trimmed,
             deviceId: deviceId(),
+            deviceName: deviceName(),
             appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0",
             platform: "macOS"
         )
@@ -212,6 +215,7 @@ final class LicenseManager: ObservableObject {
             token: activation.token,
             licenseKey: key,
             deviceId: deviceId(),
+            deviceName: deviceName(),
             appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0",
             platform: "macOS"
         )
@@ -316,5 +320,13 @@ final class LicenseManager: ObservableObject {
         let generated = UUID().uuidString
         UserDefaults.standard.set(generated, forKey: defaultsKey)
         return generated
+    }
+
+    private func deviceName() -> String {
+        let hostName = Host.current().localizedName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !hostName.isEmpty {
+            return hostName
+        }
+        return "Mac"
     }
 }
