@@ -112,11 +112,12 @@ final class OverlayWindowController: ObservableObject {
     }
 }
 
-// MARK: - Advanced Wave Visualizer
+// MARK: - Subtle Blue Glow Visualizer
 
 struct AudioWaveView: View {
     let audioLevel: Float
     let lightMode: Bool
+    let isPaused: Bool
     @State private var smoothed: Double = 0
     @State private var wavePhase: Double = 0
 
@@ -131,7 +132,7 @@ struct AudioWaveView: View {
                 let cx = size.width / 2
                 let baseY  = size.height
                 
-                // Multiple wave layers with different frequencies (subtle)
+                // Subtle wave animation
                 let wave1 = sin(t * 2.4 + wavePhase) * 0.008
                 let wave2 = sin(t * 3.7 + wavePhase * 1.3) * 0.006
                 let wave3 = sin(t * 5.2 + wavePhase * 0.8) * 0.004
@@ -140,7 +141,7 @@ struct AudioWaveView: View {
                 let breath = 1.0 + combinedWave
                 let radius = size.width * 0.48 * level * breath
 
-                // Main dome with wave distortion
+                // Main dome path
                 var wavyDome = Path()
                 wavyDome.move(to: CGPoint(x: cx - radius, y: baseY))
                 
@@ -149,11 +150,8 @@ struct AudioWaveView: View {
                     let angle = Double(i) / Double(segments) * .pi
                     let baseX = cx + cos(angle + .pi) * radius
                     let baseHeight = sin(angle) * radius
-                    
-                    // Add subtle wave distortion to height
                     let waveInfluence = sin(angle * 3.0 + t * 4.5) * 0.015 * level
                     let height = baseHeight * (1.0 + waveInfluence)
-                    
                     let y = baseY - height
                     wavyDome.addLine(to: CGPoint(x: baseX, y: y))
                 }
@@ -161,122 +159,35 @@ struct AudioWaveView: View {
                 wavyDome.addLine(to: CGPoint(x: cx + radius, y: baseY))
                 wavyDome.closeSubpath()
 
-                // Outer glow layers with wave animation
-                for layer in 0..<3 {
-                    let layerScale = 1.0 + Double(layer) * 0.15
-                    let layerOpacity = (1.0 - Double(layer) * 0.3) * level
-                    let layerRadius = radius * layerScale
-                    
-                    var glowDome = Path()
-                    glowDome.move(to: CGPoint(x: cx - layerRadius, y: baseY))
-                    
-                    for i in 0...segments {
-                        let angle = Double(i) / Double(segments) * .pi
-                        let baseX = cx + cos(angle + .pi) * layerRadius
-                        let baseHeight = sin(angle) * layerRadius
-                        
-                        let waveOffset = sin(angle * 2.0 + t * 3.8 - Double(layer) * 0.5) * 0.012 * level
-                        let height = baseHeight * (1.0 + waveOffset)
-                        
-                        let y = baseY - height
-                        glowDome.addLine(to: CGPoint(x: baseX, y: y))
-                    }
-                    
-                    glowDome.addLine(to: CGPoint(x: cx + layerRadius, y: baseY))
-                    glowDome.closeSubpath()
-                    
-                    if lightMode {
-                        ctx.fill(glowDome, with: .radialGradient(
-                            Gradient(colors: [
-                                Color(white: 0.00).opacity(0.08 * layerOpacity),
-                                .clear,
-                            ]),
-                            center: CGPoint(x: cx, y: baseY),
-                            startRadius: 0,
-                            endRadius: layerRadius
-                        ))
-                    } else {
-                        ctx.fill(glowDome, with: .radialGradient(
-                            Gradient(colors: [
-                                Color(white: 1.00).opacity(0.12 * layerOpacity),
-                                .clear,
-                            ]),
-                            center: CGPoint(x: cx, y: baseY),
-                            startRadius: 0,
-                            endRadius: layerRadius
-                        ))
-                    }
-                }
-
-                // Main dome with enhanced gradients
-                if lightMode {
-                    ctx.fill(wavyDome, with: .radialGradient(
-                        Gradient(stops: [
-                            .init(color: Color(white: 0.00).opacity(0.32 * level), location: 0.00),
-                            .init(color: Color(white: 0.12).opacity(0.22 * level), location: 0.35),
-                            .init(color: Color(white: 0.25).opacity(0.10 * level), location: 0.65),
-                            .init(color: Color(white: 0.35).opacity(0.04 * level), location: 0.85),
-                            .init(color: .clear,                                   location: 1.00),
-                        ]),
-                        center:      CGPoint(x: cx, y: baseY),
-                        startRadius: 0,
-                        endRadius:   radius
-                    ))
-                } else {
-                    ctx.fill(wavyDome, with: .radialGradient(
-                        Gradient(stops: [
-                            .init(color: Color(white: 1.00).opacity(0.65 * level), location: 0.00),
-                            .init(color: Color(white: 0.88).opacity(0.45 * level), location: 0.30),
-                            .init(color: Color(white: 0.70).opacity(0.22 * level), location: 0.60),
-                            .init(color: Color(white: 0.50).opacity(0.08 * level), location: 0.82),
-                            .init(color: .clear,                                   location: 1.00),
-                        ]),
-                        center:      CGPoint(x: cx, y: baseY),
-                        startRadius: 0,
-                        endRadius:   radius
-                    ))
-                }
-
-                // Bright core with subtle wave animation
-                let coreR = radius * (0.36 + sin(t * 3.2) * 0.015 * level)
-                var waveCore = Path()
-                waveCore.move(to: CGPoint(x: cx - coreR, y: baseY))
-                
-                for i in 0...40 {
-                    let angle = Double(i) / 40.0 * .pi
-                    let baseX = cx + cos(angle + .pi) * coreR
-                    let baseHeight = sin(angle) * coreR
-                    
-                    let microWave = sin(angle * 4.0 + t * 6.0) * 0.02 * level
-                    let height = baseHeight * (1.0 + microWave)
-                    
-                    let y = baseY - height
-                    waveCore.addLine(to: CGPoint(x: baseX, y: y))
-                }
-                
-                waveCore.addLine(to: CGPoint(x: cx + coreR, y: baseY))
-                waveCore.closeSubpath()
+                // Subtle blue/red glow based on pause state
+                let glowColor = isPaused 
+                    ? Color(red: 1.0, green: 0.2, blue: 0.2)  // Red when paused
+                    : Color(red: 0.3, green: 0.5, blue: 1.0)  // Blue when active
                 
                 if lightMode {
-                    ctx.fill(waveCore, with: .radialGradient(
-                        Gradient(colors: [
-                            Color(white: 0.00).opacity(0.55 * level),
-                            Color(white: 0.08).opacity(0.28 * level),
-                            .clear,
+                    // Light mode: very subtle dark glow
+                    ctx.fill(wavyDome, with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: Color(white: 0.00).opacity(0.08 * level), location: 0.00),
+                            .init(color: Color(white: 0.05).opacity(0.04 * level), location: 0.50),
+                            .init(color: .clear, location: 1.00),
                         ]),
                         center: CGPoint(x: cx, y: baseY),
-                        startRadius: 0, endRadius: coreR
+                        startRadius: 0,
+                        endRadius: radius
                     ))
                 } else {
-                    ctx.fill(waveCore, with: .radialGradient(
-                        Gradient(colors: [
-                            Color(white: 1.00).opacity(0.95 * level),
-                            Color(white: 0.92).opacity(0.65 * level),
-                            Color(white: 0.80).opacity(0.25 * level),
-                            .clear,
+                    // Dark mode: subtle blue/red glow like the image
+                    ctx.fill(wavyDome, with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: glowColor.opacity(0.18 * level), location: 0.00),
+                            .init(color: glowColor.opacity(0.10 * level), location: 0.40),
+                            .init(color: glowColor.opacity(0.04 * level), location: 0.70),
+                            .init(color: .clear, location: 1.00),
                         ]),
                         center: CGPoint(x: cx, y: baseY),
-                        startRadius: 0, endRadius: coreR
+                        startRadius: 0,
+                        endRadius: radius
                     ))
                 }
             }
@@ -319,8 +230,8 @@ struct OverlayPillView: View {
             )
             .animation(.easeInOut(duration: 0.3), value: isLight)
 
-            // Reactive voice wave
-            AudioWaveView(audioLevel: speechManager.audioLevel, lightMode: isLight)
+            // Reactive voice wave with pause indicator
+            AudioWaveView(audioLevel: speechManager.audioLevel, lightMode: isLight, isPaused: speechManager.isPaused)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .clipShape(
                     UnevenRoundedRectangle(
@@ -347,6 +258,21 @@ struct OverlayPillView: View {
                 lineWidth: 0.75
             )
             .animation(.easeInOut(duration: 0.3), value: isLight)
+
+            // Red glow when hovering (paused state)
+            if speechManager.isPaused {
+                UnevenRoundedRectangle(
+                    topLeadingRadius: 0, bottomLeadingRadius: 24,
+                    bottomTrailingRadius: 24, topTrailingRadius: 0,
+                    style: .continuous
+                )
+                .strokeBorder(
+                    Color.red.opacity(0.5),
+                    lineWidth: 2.0
+                )
+                .blur(radius: 3)
+                .transition(.opacity)
+            }
 
             // Filler word flash — subtle glow pulse
             if speechManager.fillerFlash {
@@ -401,7 +327,7 @@ struct OverlayPillView: View {
             }
             .clipped()
 
-            // Progress bar — fades in when voice activity is detected.
+            // Progress bar — always visible
             VStack(spacing: 0) {
                 Spacer()
                 GeometryReader { bar in
@@ -418,8 +344,6 @@ struct OverlayPillView: View {
                 .frame(height: 3)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .opacity(speechManager.isVoiceActive ? 1 : 0)
-            .animation(.easeInOut(duration: 0.3), value: speechManager.isVoiceActive)
 
             // 3-2-1 countdown overlay
             if speechManager.isCountingDown {
@@ -446,6 +370,7 @@ struct OverlayPillView: View {
         )
         .animation(.easeOut(duration: 0.2), value: speechManager.fillerFlash)
         .animation(.easeInOut(duration: 0.25), value: speechManager.focusGlow)
+        .animation(.easeInOut(duration: 0.2), value: speechManager.isPaused)
         .preferredColorScheme(.dark)
         .onHover { speechManager.isPaused = $0 }
     }
