@@ -122,27 +122,22 @@ struct AudioWaveView: View {
 
     var body: some View {
         TimelineView(.animation) { tl in
-            let t = tl.date.timeIntervalSinceReferenceDate
             Canvas { ctx, size in
-                let target  = Double(min(audioLevel * 20.0, 1.0))
-                let level   = smoothed + (target - smoothed) * (target > smoothed ? 0.28 : 0.05)
-                guard level > 0.01 else { return }
-
+                let target = Double(min(audioLevel * 20.0, 1.0))
+                let level = smoothed + (target - smoothed) * (target > smoothed ? 0.28 : 0.05)
+                let intensity = max(0.28, level)
+                
                 let cx = size.width / 2
-                let baseY  = size.height
+                let baseY = size.height
                 
-                // Subtle breathing
-                let breath = 1.0 + sin(t * 1.8) * 0.04 * level
+                // Static geometry
+                let width = size.width * 0.60
+                let height = size.height * 0.12
                 
-                // WIDER arc: 60% of screen width, 12% height
-                let width = size.width * 0.60 * breath
-                let height = size.height * 0.12 * level
-                
-                // Create thin spherical arc (slice of large sphere)
+                // Create perfectly symmetric semicircle arc
                 var arc = Path()
                 arc.move(to: CGPoint(x: cx - width/2, y: baseY))
                 
-                // Draw smooth arc
                 let segments = 60
                 for i in 0...segments {
                     let t = Double(i) / Double(segments)
@@ -159,23 +154,9 @@ struct AudioWaveView: View {
                     // Light mode: dark gray tight gradient
                     ctx.fill(arc, with: .radialGradient(
                         Gradient(stops: [
-                            .init(color: Color(white: 0.35).opacity(0.55 * level), location: 0.00),
-                            .init(color: Color(white: 0.45).opacity(0.32 * level), location: 0.60),
-                            .init(color: Color(white: 0.55).opacity(0.08 * level), location: 0.90),
-                            .init(color: .clear, location: 1.00),
-                        ]),
-                        center: CGPoint(x: cx, y: baseY),
-                        startRadius: 0,
-                        endRadius: width / 2
-                    ))
-                } else {
-                    // Dark mode: tight gradient gray (brighter center, darker edges)
-                    ctx.fill(arc, with: .radialGradient(
-                        Gradient(stops: [
-                            .init(color: Color(white: 0.82).opacity(0.75 * level), location: 0.00),
-                            .init(color: Color(white: 0.70).opacity(0.55 * level), location: 0.45),
-                            .init(color: Color(white: 0.58).opacity(0.30 * level), location: 0.75),
-                            .init(color: Color(white: 0.46).opacity(0.08 * level), location: 0.94),
+                            .init(color: Color(white: 0.35).opacity(0.55 * intensity), location: 0.00),
+                            .init(color: Color(white: 0.45).opacity(0.32 * intensity), location: 0.60),
+                            .init(color: Color(white: 0.55).opacity(0.08 * intensity), location: 0.90),
                             .init(color: .clear, location: 1.00),
                         ]),
                         center: CGPoint(x: cx, y: baseY),
@@ -183,29 +164,58 @@ struct AudioWaveView: View {
                         endRadius: width / 2
                     ))
                     
-                    // Very controlled glow - stays close to arc
-                    let glowRadius = width * 0.55  // Halo stays close
+                    // Light mode: crisp highlight stroke along arc edge
+                    ctx.stroke(
+                        arc,
+                        with: .color(.white.opacity(0.28 * intensity)),
+                        lineWidth: 0.8
+                    )
+                } else {
+                    // Dark mode: tight gradient gray (center white to edges)
+                    ctx.fill(arc, with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: Color(white: 0.84).opacity(0.84 * intensity), location: 0.00),
+                            .init(color: Color(white: 0.68).opacity(0.68 * intensity), location: 0.68),
+                            .init(color: Color(white: 0.54).opacity(0.54 * intensity), location: 0.54),
+                            .init(color: Color(white: 0.42).opacity(0.42 * intensity), location: 0.42),
+                            .init(color: .clear, location: 1.00),
+                        ]),
+                        center: CGPoint(x: cx, y: baseY),
+                        startRadius: 0,
+                        endRadius: width / 2
+                    ))
+                    
+                    // Dark mode: crisp highlight stroke along arc edge only
+                    ctx.stroke(
+                        arc,
+                        with: .color(.white.opacity(0.28 * intensity)),
+                        lineWidth: 0.8
+                    )
+                    
+                    // Dark mode: subtle close halo (slightly larger)
+                    let haloWidth = width * 1.06
+                    let haloHeight = height * 1.03
                     var halo = Path()
-                    halo.move(to: CGPoint(x: cx - glowRadius/2, y: baseY))
-                    for i in 0...50 {
-                        let t = Double(i) / 50.0
+                    halo.move(to: CGPoint(x: cx - haloWidth/2, y: baseY))
+                    for i in 0...60 {
+                        let t = Double(i) / 60.0
                         let angle = t * .pi
-                        let x = cx + (cos(angle + .pi) * glowRadius / 2)
-                        let y = baseY - (sin(angle) * height * 0.95)
+                        let x = cx + (cos(angle + .pi) * haloWidth / 2)
+                        let y = baseY - (sin(angle) * haloHeight)
                         halo.addLine(to: CGPoint(x: x, y: y))
                     }
-                    halo.addLine(to: CGPoint(x: cx + glowRadius/2, y: baseY))
+                    halo.addLine(to: CGPoint(x: cx + haloWidth/2, y: baseY))
                     halo.closeSubpath()
                     
                     ctx.fill(halo, with: .radialGradient(
                         Gradient(stops: [
-                            .init(color: Color(white: 0.65).opacity(0.15 * level), location: 0.80),
-                            .init(color: Color(white: 0.55).opacity(0.06 * level), location: 0.94),
+                            .init(color: Color(white: 0.65).opacity(0.10 * intensity), location: 0.80),
+                            .init(color: Color(white: 0.55).opacity(0.03 * intensity), location: 0.94),
                             .init(color: .clear, location: 1.00),
                         ]),
                         center: CGPoint(x: cx, y: baseY),
                         startRadius: width / 2 * 0.8,
-                        endRadius: glowRadius / 2
+                        endRadius: haloWidth / 2
                     ))
                 }
             }
@@ -276,7 +286,7 @@ struct OverlayPillView: View {
             )
             .animation(.easeInOut(duration: 0.3), value: isLight)
 
-            // Soft red glow when paused (spread to left/right/bottom, not too bright)
+            // Soft red glow when paused (lower area emphasis only)
             if speechManager.isPaused {
                 UnevenRoundedRectangle(
                     topLeadingRadius: 0, bottomLeadingRadius: 24,
@@ -287,16 +297,24 @@ struct OverlayPillView: View {
                     LinearGradient(
                         colors: [
                             .clear,  // No glow at top
-                            Color.red.opacity(0.3),  // Soft left side
-                            Color.red.opacity(0.5),  // Brighter bottom
-                            Color.red.opacity(0.3),  // Soft right side
+                            Color.red.opacity(0.18),  // Soft left side
+                            Color.red.opacity(0.30),  // Bottom emphasis
+                            Color.red.opacity(0.18),  // Soft right side
                         ],
                         startPoint: .top,
                         endPoint: .bottom
                     ),
                     lineWidth: 2.0
                 )
-                .blur(radius: 4)
+                .blur(radius: 3)
+                .mask(
+                    VStack(spacing: 0) {
+                        LinearGradient(gradient: Gradient(colors: [.clear, .black]), startPoint: .top, endPoint: .bottom)
+                            .frame(height: 94 * 0.30)
+                        Color.black
+                            .frame(height: 94 * 0.70)
+                    }
+                )
                 .transition(.opacity)
             }
 
@@ -354,22 +372,19 @@ struct OverlayPillView: View {
             .clipped()
 
             // Progress bar — always visible
-            VStack(spacing: 0) {
-                Spacer()
+            ZStack(alignment: .bottomLeading) {
+                Rectangle()
+                    .fill(Color(white: isLight ? 0 : 1, opacity: 0.10))
+                    .frame(height: 3)
                 GeometryReader { bar in
-                    ZStack(alignment: .leading) {
-                        Rectangle()
-                            .fill(Color(white: isLight ? 0 : 1, opacity: 0.10))
-                            .frame(height: 3)
-                        Rectangle()
-                            .fill(Color(white: isLight ? 0 : 1, opacity: 0.60))
-                            .frame(width: max(0, CGFloat(progressFraction) * bar.size.width), height: 3)
-                            .animation(.linear(duration: 0.4), value: progressFraction)
-                    }
+                    Rectangle()
+                        .fill(Color(white: isLight ? 0 : 1, opacity: 0.60))
+                        .frame(width: max(0, CGFloat(progressFraction) * bar.size.width), height: 3)
+                        .animation(.linear(duration: 0.4), value: progressFraction)
                 }
-                .frame(height: 3)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            .allowsHitTesting(false)
 
             // 3-2-1 countdown overlay
             if speechManager.isCountingDown {
