@@ -112,7 +112,7 @@ final class OverlayWindowController: ObservableObject {
     }
 }
 
-// MARK: - Low Wide Hemisphere Visualizer
+// MARK: - Thin Spherical Arc Visualizer
 
 struct AudioWaveView: View {
     let audioLevel: Float
@@ -132,36 +132,36 @@ struct AudioWaveView: View {
                 let baseY  = size.height
                 
                 // Subtle breathing
-                let breath = 1.0 + sin(t * 1.8) * 0.05 * level
+                let breath = 1.0 + sin(t * 1.8) * 0.04 * level
                 
-                // WIDE diameter (40% of width), but VERY LOW height
-                let width = size.width * 0.40 * breath
-                let height = width * 0.12  // Only 12% height-to-width ratio = very low dome
+                // WIDER arc: 60% of screen width, 12% height
+                let width = size.width * 0.60 * breath
+                let height = size.height * 0.12 * level
                 
-                // Create low wide hemisphere
-                var hemisphere = Path()
-                hemisphere.move(to: CGPoint(x: cx - width/2, y: baseY))
+                // Create thin spherical arc (slice of large sphere)
+                var arc = Path()
+                arc.move(to: CGPoint(x: cx - width/2, y: baseY))
                 
-                // Draw smooth arc with very low profile
-                let segments = 50
+                // Draw smooth arc
+                let segments = 60
                 for i in 0...segments {
                     let t = Double(i) / Double(segments)
                     let angle = t * .pi
                     let x = cx + (cos(angle + .pi) * width / 2)
-                    let y = baseY - (sin(angle) * height * level)
-                    hemisphere.addLine(to: CGPoint(x: x, y: y))
+                    let y = baseY - (sin(angle) * height)
+                    arc.addLine(to: CGPoint(x: x, y: y))
                 }
                 
-                hemisphere.addLine(to: CGPoint(x: cx + width/2, y: baseY))
-                hemisphere.closeSubpath()
+                arc.addLine(to: CGPoint(x: cx + width/2, y: baseY))
+                arc.closeSubpath()
 
                 if lightMode {
-                    // Light mode: dark gray gradient
-                    ctx.fill(hemisphere, with: .radialGradient(
+                    // Light mode: dark gray tight gradient
+                    ctx.fill(arc, with: .radialGradient(
                         Gradient(stops: [
-                            .init(color: Color(white: 0.30).opacity(0.50 * level), location: 0.00),
-                            .init(color: Color(white: 0.40).opacity(0.30 * level), location: 0.50),
-                            .init(color: Color(white: 0.50).opacity(0.10 * level), location: 0.85),
+                            .init(color: Color(white: 0.35).opacity(0.55 * level), location: 0.00),
+                            .init(color: Color(white: 0.45).opacity(0.32 * level), location: 0.60),
+                            .init(color: Color(white: 0.55).opacity(0.08 * level), location: 0.90),
                             .init(color: .clear, location: 1.00),
                         ]),
                         center: CGPoint(x: cx, y: baseY),
@@ -169,14 +169,13 @@ struct AudioWaveView: View {
                         endRadius: width / 2
                     ))
                 } else {
-                    // Dark mode: gradient gray (darker at edges, lighter at center)
-                    // Main hemisphere with soft falloff
-                    ctx.fill(hemisphere, with: .radialGradient(
+                    // Dark mode: tight gradient gray (brighter center, darker edges)
+                    ctx.fill(arc, with: .radialGradient(
                         Gradient(stops: [
-                            .init(color: Color(white: 0.75).opacity(0.70 * level), location: 0.00),
-                            .init(color: Color(white: 0.65).opacity(0.50 * level), location: 0.40),
-                            .init(color: Color(white: 0.55).opacity(0.28 * level), location: 0.70),
-                            .init(color: Color(white: 0.45).opacity(0.08 * level), location: 0.92),
+                            .init(color: Color(white: 0.82).opacity(0.75 * level), location: 0.00),
+                            .init(color: Color(white: 0.70).opacity(0.55 * level), location: 0.45),
+                            .init(color: Color(white: 0.58).opacity(0.30 * level), location: 0.75),
+                            .init(color: Color(white: 0.46).opacity(0.08 * level), location: 0.94),
                             .init(color: .clear, location: 1.00),
                         ]),
                         center: CGPoint(x: cx, y: baseY),
@@ -184,54 +183,29 @@ struct AudioWaveView: View {
                         endRadius: width / 2
                     ))
                     
-                    // Subtle inner glow at center
-                    let glowRadius = width * 0.20
-                    var innerGlow = Path()
-                    innerGlow.move(to: CGPoint(x: cx - glowRadius/2, y: baseY))
-                    for i in 0...30 {
-                        let t = Double(i) / 30.0
-                        let angle = t * .pi
-                        let x = cx + (cos(angle + .pi) * glowRadius / 2)
-                        let y = baseY - (sin(angle) * glowRadius / 2 * 0.12 * level)
-                        innerGlow.addLine(to: CGPoint(x: x, y: y))
-                    }
-                    innerGlow.addLine(to: CGPoint(x: cx + glowRadius/2, y: baseY))
-                    innerGlow.closeSubpath()
-                    
-                    ctx.fill(innerGlow, with: .radialGradient(
-                        Gradient(stops: [
-                            .init(color: Color(white: 0.90).opacity(0.80 * level), location: 0.00),
-                            .init(color: Color(white: 0.80).opacity(0.50 * level), location: 0.60),
-                            .init(color: .clear, location: 1.00),
-                        ]),
-                        center: CGPoint(x: cx, y: baseY),
-                        startRadius: 0,
-                        endRadius: glowRadius / 2
-                    ))
-                    
-                    // Faint outer diffusion halo
-                    let haloRadius = width * 0.65
+                    // Very controlled glow - stays close to arc
+                    let glowRadius = width * 0.55  // Halo stays close
                     var halo = Path()
-                    halo.move(to: CGPoint(x: cx - haloRadius/2, y: baseY))
+                    halo.move(to: CGPoint(x: cx - glowRadius/2, y: baseY))
                     for i in 0...50 {
                         let t = Double(i) / 50.0
                         let angle = t * .pi
-                        let x = cx + (cos(angle + .pi) * haloRadius / 2)
-                        let y = baseY - (sin(angle) * haloRadius / 2 * 0.10 * level)
+                        let x = cx + (cos(angle + .pi) * glowRadius / 2)
+                        let y = baseY - (sin(angle) * height * 0.95)
                         halo.addLine(to: CGPoint(x: x, y: y))
                     }
-                    halo.addLine(to: CGPoint(x: cx + haloRadius/2, y: baseY))
+                    halo.addLine(to: CGPoint(x: cx + glowRadius/2, y: baseY))
                     halo.closeSubpath()
                     
                     ctx.fill(halo, with: .radialGradient(
-                        Gradient(colors: [
-                            Color(white: 0.60).opacity(0.12 * level),
-                            Color(white: 0.50).opacity(0.04 * level),
-                            .clear,
+                        Gradient(stops: [
+                            .init(color: Color(white: 0.65).opacity(0.15 * level), location: 0.80),
+                            .init(color: Color(white: 0.55).opacity(0.06 * level), location: 0.94),
+                            .init(color: .clear, location: 1.00),
                         ]),
                         center: CGPoint(x: cx, y: baseY),
-                        startRadius: width / 2,
-                        endRadius: haloRadius / 2
+                        startRadius: width / 2 * 0.8,
+                        endRadius: glowRadius / 2
                     ))
                 }
             }
