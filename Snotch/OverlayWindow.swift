@@ -112,7 +112,7 @@ final class OverlayWindowController: ObservableObject {
     }
 }
 
-// MARK: - Subtle Blue Glow Visualizer
+// MARK: - Minimal Futuristic Visualizer
 
 struct AudioWaveView: View {
     let audioLevel: Float
@@ -141,9 +141,9 @@ struct AudioWaveView: View {
                 let breath = 1.0 + combinedWave
                 let radius = size.width * 0.48 * level * breath
 
-                // Main dome path
-                var wavyDome = Path()
-                wavyDome.move(to: CGPoint(x: cx - radius, y: baseY))
+                // Smooth dome path
+                var dome = Path()
+                dome.move(to: CGPoint(x: cx - radius, y: baseY))
                 
                 let segments = 60
                 for i in 0...segments {
@@ -153,23 +153,20 @@ struct AudioWaveView: View {
                     let waveInfluence = sin(angle * 3.0 + t * 4.5) * 0.015 * level
                     let height = baseHeight * (1.0 + waveInfluence)
                     let y = baseY - height
-                    wavyDome.addLine(to: CGPoint(x: baseX, y: y))
+                    dome.addLine(to: CGPoint(x: baseX, y: y))
                 }
                 
-                wavyDome.addLine(to: CGPoint(x: cx + radius, y: baseY))
-                wavyDome.closeSubpath()
+                dome.addLine(to: CGPoint(x: cx + radius, y: baseY))
+                dome.closeSubpath()
 
-                // Subtle blue/red glow based on pause state
-                let glowColor = isPaused 
-                    ? Color(red: 1.0, green: 0.2, blue: 0.2)  // Red when paused
-                    : Color(red: 0.3, green: 0.5, blue: 1.0)  // Blue when active
-                
+                // Soft white glowing dome - Apple style
                 if lightMode {
-                    // Light mode: very subtle dark glow
-                    ctx.fill(wavyDome, with: .radialGradient(
+                    // Light mode: soft gray dome
+                    ctx.fill(dome, with: .radialGradient(
                         Gradient(stops: [
-                            .init(color: Color(white: 0.00).opacity(0.08 * level), location: 0.00),
-                            .init(color: Color(white: 0.05).opacity(0.04 * level), location: 0.50),
+                            .init(color: Color(white: 0.2).opacity(0.35 * level), location: 0.00),
+                            .init(color: Color(white: 0.3).opacity(0.20 * level), location: 0.45),
+                            .init(color: Color(white: 0.4).opacity(0.08 * level), location: 0.75),
                             .init(color: .clear, location: 1.00),
                         ]),
                         center: CGPoint(x: cx, y: baseY),
@@ -177,17 +174,42 @@ struct AudioWaveView: View {
                         endRadius: radius
                     ))
                 } else {
-                    // Dark mode: subtle blue/red glow like the image
-                    ctx.fill(wavyDome, with: .radialGradient(
+                    // Dark mode: bright white glowing dome
+                    ctx.fill(dome, with: .radialGradient(
                         Gradient(stops: [
-                            .init(color: glowColor.opacity(0.18 * level), location: 0.00),
-                            .init(color: glowColor.opacity(0.10 * level), location: 0.40),
-                            .init(color: glowColor.opacity(0.04 * level), location: 0.70),
+                            .init(color: Color.white.opacity(0.75 * level), location: 0.00),
+                            .init(color: Color.white.opacity(0.50 * level), location: 0.40),
+                            .init(color: Color.white.opacity(0.25 * level), location: 0.70),
+                            .init(color: Color.white.opacity(0.08 * level), location: 0.90),
                             .init(color: .clear, location: 1.00),
                         ]),
                         center: CGPoint(x: cx, y: baseY),
                         startRadius: 0,
                         endRadius: radius
+                    ))
+                    
+                    // Bright core for extra glow
+                    let coreRadius = radius * 0.5
+                    var core = Path()
+                    core.move(to: CGPoint(x: cx - coreRadius, y: baseY))
+                    for i in 0...40 {
+                        let angle = Double(i) / 40.0 * .pi
+                        let x = cx + cos(angle + .pi) * coreRadius
+                        let y = baseY - sin(angle) * coreRadius
+                        core.addLine(to: CGPoint(x: x, y: y))
+                    }
+                    core.addLine(to: CGPoint(x: cx + coreRadius, y: baseY))
+                    core.closeSubpath()
+                    
+                    ctx.fill(core, with: .radialGradient(
+                        Gradient(colors: [
+                            Color.white.opacity(0.9 * level),
+                            Color.white.opacity(0.6 * level),
+                            .clear,
+                        ]),
+                        center: CGPoint(x: cx, y: baseY),
+                        startRadius: 0,
+                        endRadius: coreRadius
                     ))
                 }
             }
@@ -259,7 +281,7 @@ struct OverlayPillView: View {
             )
             .animation(.easeInOut(duration: 0.3), value: isLight)
 
-            // Red glow when hovering (paused state)
+            // Solid bright red border when hovering (paused state)
             if speechManager.isPaused {
                 UnevenRoundedRectangle(
                     topLeadingRadius: 0, bottomLeadingRadius: 24,
@@ -267,10 +289,9 @@ struct OverlayPillView: View {
                     style: .continuous
                 )
                 .strokeBorder(
-                    Color.red.opacity(0.5),
-                    lineWidth: 2.0
+                    Color.red,
+                    lineWidth: 1.5
                 )
-                .blur(radius: 3)
                 .transition(.opacity)
             }
 
