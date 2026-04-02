@@ -112,14 +112,13 @@ final class OverlayWindowController: ObservableObject {
     }
 }
 
-// MARK: - Concentrated Glow Visualizer
+// MARK: - Low Wide Hemisphere Visualizer
 
 struct AudioWaveView: View {
     let audioLevel: Float
     let lightMode: Bool
     let isPaused: Bool
     @State private var smoothed: Double = 0
-    @State private var wavePhase: Double = 0
 
     var body: some View {
         TimelineView(.animation) { tl in
@@ -132,83 +131,113 @@ struct AudioWaveView: View {
                 let cx = size.width / 2
                 let baseY  = size.height
                 
-                // Subtle breathing animation
-                let breath = 1.0 + sin(t * 1.8) * 0.08 * level
+                // Subtle breathing
+                let breath = 1.0 + sin(t * 1.8) * 0.05 * level
                 
-                // Much smaller, concentrated radius - tight glow
-                let radius = size.width * 0.25 * level * breath
-
-                // Simple arc path - compact and centered
-                var arc = Path()
-                arc.move(to: CGPoint(x: cx - radius, y: baseY))
-                arc.addArc(
-                    center: CGPoint(x: cx, y: baseY),
-                    radius: radius,
-                    startAngle: .degrees(180),
-                    endAngle: .degrees(0),
-                    clockwise: false
-                )
-                arc.addLine(to: CGPoint(x: cx + radius, y: baseY))
-                arc.closeSubpath()
+                // WIDE diameter (40% of width), but VERY LOW height
+                let width = size.width * 0.40 * breath
+                let height = width * 0.12  // Only 12% height-to-width ratio = very low dome
+                
+                // Create low wide hemisphere
+                var hemisphere = Path()
+                hemisphere.move(to: CGPoint(x: cx - width/2, y: baseY))
+                
+                // Draw smooth arc with very low profile
+                let segments = 50
+                for i in 0...segments {
+                    let t = Double(i) / Double(segments)
+                    let angle = t * .pi
+                    let x = cx + (cos(angle + .pi) * width / 2)
+                    let y = baseY - (sin(angle) * height * level)
+                    hemisphere.addLine(to: CGPoint(x: x, y: y))
+                }
+                
+                hemisphere.addLine(to: CGPoint(x: cx + width/2, y: baseY))
+                hemisphere.closeSubpath()
 
                 if lightMode {
-                    // Light mode: dark gray concentrated glow
-                    ctx.fill(arc, with: .radialGradient(
+                    // Light mode: dark gray gradient
+                    ctx.fill(hemisphere, with: .radialGradient(
                         Gradient(stops: [
-                            .init(color: Color(white: 0.15).opacity(0.55 * level), location: 0.00),
-                            .init(color: Color(white: 0.25).opacity(0.35 * level), location: 0.50),
-                            .init(color: Color(white: 0.35).opacity(0.15 * level), location: 0.80),
+                            .init(color: Color(white: 0.30).opacity(0.50 * level), location: 0.00),
+                            .init(color: Color(white: 0.40).opacity(0.30 * level), location: 0.50),
+                            .init(color: Color(white: 0.50).opacity(0.10 * level), location: 0.85),
                             .init(color: .clear, location: 1.00),
                         ]),
                         center: CGPoint(x: cx, y: baseY),
                         startRadius: 0,
-                        endRadius: radius
+                        endRadius: width / 2
                     ))
                 } else {
-                    // Dark mode: tight grayish-white glow (not spread out)
-                    ctx.fill(arc, with: .radialGradient(
+                    // Dark mode: gradient gray (darker at edges, lighter at center)
+                    // Main hemisphere with soft falloff
+                    ctx.fill(hemisphere, with: .radialGradient(
                         Gradient(stops: [
-                            .init(color: Color(white: 0.95).opacity(0.85 * level), location: 0.00),
-                            .init(color: Color(white: 0.85).opacity(0.65 * level), location: 0.40),
-                            .init(color: Color(white: 0.75).opacity(0.35 * level), location: 0.70),
-                            .init(color: Color(white: 0.65).opacity(0.12 * level), location: 0.88),
+                            .init(color: Color(white: 0.75).opacity(0.70 * level), location: 0.00),
+                            .init(color: Color(white: 0.65).opacity(0.50 * level), location: 0.40),
+                            .init(color: Color(white: 0.55).opacity(0.28 * level), location: 0.70),
+                            .init(color: Color(white: 0.45).opacity(0.08 * level), location: 0.92),
                             .init(color: .clear, location: 1.00),
                         ]),
                         center: CGPoint(x: cx, y: baseY),
                         startRadius: 0,
-                        endRadius: radius
+                        endRadius: width / 2
                     ))
                     
-                    // Bright focused core - very tight
-                    let coreRadius = radius * 0.45
-                    var core = Path()
-                    core.move(to: CGPoint(x: cx - coreRadius, y: baseY))
-                    core.addArc(
-                        center: CGPoint(x: cx, y: baseY),
-                        radius: coreRadius,
-                        startAngle: .degrees(180),
-                        endAngle: .degrees(0),
-                        clockwise: false
-                    )
-                    core.addLine(to: CGPoint(x: cx + coreRadius, y: baseY))
-                    core.closeSubpath()
+                    // Subtle inner glow at center
+                    let glowRadius = width * 0.20
+                    var innerGlow = Path()
+                    innerGlow.move(to: CGPoint(x: cx - glowRadius/2, y: baseY))
+                    for i in 0...30 {
+                        let t = Double(i) / 30.0
+                        let angle = t * .pi
+                        let x = cx + (cos(angle + .pi) * glowRadius / 2)
+                        let y = baseY - (sin(angle) * glowRadius / 2 * 0.12 * level)
+                        innerGlow.addLine(to: CGPoint(x: x, y: y))
+                    }
+                    innerGlow.addLine(to: CGPoint(x: cx + glowRadius/2, y: baseY))
+                    innerGlow.closeSubpath()
                     
-                    ctx.fill(core, with: .radialGradient(
+                    ctx.fill(innerGlow, with: .radialGradient(
                         Gradient(stops: [
-                            .init(color: Color.white.opacity(0.95 * level), location: 0.00),
-                            .init(color: Color(white: 0.90).opacity(0.75 * level), location: 0.60),
+                            .init(color: Color(white: 0.90).opacity(0.80 * level), location: 0.00),
+                            .init(color: Color(white: 0.80).opacity(0.50 * level), location: 0.60),
                             .init(color: .clear, location: 1.00),
                         ]),
                         center: CGPoint(x: cx, y: baseY),
                         startRadius: 0,
-                        endRadius: coreRadius
+                        endRadius: glowRadius / 2
+                    ))
+                    
+                    // Faint outer diffusion halo
+                    let haloRadius = width * 0.65
+                    var halo = Path()
+                    halo.move(to: CGPoint(x: cx - haloRadius/2, y: baseY))
+                    for i in 0...50 {
+                        let t = Double(i) / 50.0
+                        let angle = t * .pi
+                        let x = cx + (cos(angle + .pi) * haloRadius / 2)
+                        let y = baseY - (sin(angle) * haloRadius / 2 * 0.10 * level)
+                        halo.addLine(to: CGPoint(x: x, y: y))
+                    }
+                    halo.addLine(to: CGPoint(x: cx + haloRadius/2, y: baseY))
+                    halo.closeSubpath()
+                    
+                    ctx.fill(halo, with: .radialGradient(
+                        Gradient(colors: [
+                            Color(white: 0.60).opacity(0.12 * level),
+                            Color(white: 0.50).opacity(0.04 * level),
+                            .clear,
+                        ]),
+                        center: CGPoint(x: cx, y: baseY),
+                        startRadius: width / 2,
+                        endRadius: haloRadius / 2
                     ))
                 }
             }
             .task(id: tl.date) {
                 let target = Double(min(audioLevel * 20.0, 1.0))
                 smoothed = smoothed + (target - smoothed) * (target > smoothed ? 0.28 : 0.05)
-                wavePhase += 0.08
             }
         }
     }
@@ -273,7 +302,7 @@ struct OverlayPillView: View {
             )
             .animation(.easeInOut(duration: 0.3), value: isLight)
 
-            // Solid bright red border when hovering (paused state)
+            // Soft red glow when paused (spread to left/right/bottom, not too bright)
             if speechManager.isPaused {
                 UnevenRoundedRectangle(
                     topLeadingRadius: 0, bottomLeadingRadius: 24,
@@ -281,9 +310,19 @@ struct OverlayPillView: View {
                     style: .continuous
                 )
                 .strokeBorder(
-                    Color.red,
-                    lineWidth: 1.5
+                    LinearGradient(
+                        colors: [
+                            .clear,  // No glow at top
+                            Color.red.opacity(0.3),  // Soft left side
+                            Color.red.opacity(0.5),  // Brighter bottom
+                            Color.red.opacity(0.3),  // Soft right side
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 2.0
                 )
+                .blur(radius: 4)
                 .transition(.opacity)
             }
 
