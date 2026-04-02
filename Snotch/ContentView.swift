@@ -1413,17 +1413,6 @@ struct ContentView: View {
     private func requestStyleCaptureTopic() async -> String {
         return "Talk for 30 seconds about your favorite app and why you use it daily."
     }
-            }
-
-            let decoded = try JSONDecoder().decode(BackendBundlesResponse.self, from: data)
-            if decoded.ok, let first = decoded.hooks.first ?? decoded.titles.first {
-                return first.trimmingCharacters(in: .whitespacesAndNewlines)
-            }
-            return "Talk for 30 seconds about a product you genuinely like and why."
-        } catch {
-            return "Talk for 30 seconds about a product you genuinely like and why."
-        }
-    }
 
     private struct BackendGenerateRequest: Encodable {
         let topic: String
