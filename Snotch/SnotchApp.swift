@@ -7,9 +7,7 @@ struct SnotchApp: App {
     @AppStorage("snotch.onboardingDone") private var onboardingDone: Bool = false
     @StateObject private var speechManager: SpeechManager
     @StateObject private var overlayController: OverlayWindowController
-    @StateObject private var licenseManager = LicenseManager()
     @State private var globalMonitor: Any? = nil
-    @State private var showManageLicense: Bool = false
 
     init() {
         let sm = SpeechManager()
@@ -20,11 +18,8 @@ struct SnotchApp: App {
     var body: some Scene {
         WindowGroup("Snotch Editor") {
             Group {
-                if !licenseManager.isLicensed {
-                    LicenseActivationView(licenseManager: licenseManager)
-                } else if onboardingDone {
+                if onboardingDone {
                     ContentView(
-                        licenseManager:    licenseManager,
                         speechManager:     speechManager,
                         overlayController: overlayController
                     )
@@ -35,8 +30,7 @@ struct SnotchApp: App {
                 }
             }
             .onAppear {
-                Task { await licenseManager.startupValidate() }
-                if licenseManager.isLicensed && onboardingDone {
+                if onboardingDone {
                     installGlobalHotkeys()
                     overlayController.show()
                 }
@@ -46,25 +40,13 @@ struct SnotchApp: App {
                     queue: .main
                 ) { _ in overlayController.repositionIfNeeded() }
             }
-            .onChange(of: licenseManager.isLicensed) { licensed in
-                if licensed && onboardingDone {
-                    installGlobalHotkeys()
-                    overlayController.show()
-                } else {
-                    removeGlobalHotkeys()
-                    overlayController.hide()
-                }
-            }
             .onChange(of: onboardingDone) { done in
-                if done && licenseManager.isLicensed {
+                if done {
                     installGlobalHotkeys()
                     overlayController.show()
                 }
             }
             .onDisappear { removeGlobalHotkeys() }
-            .sheet(isPresented: $showManageLicense) {
-                ManageLicenseView(licenseManager: licenseManager)
-            }
         }
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified)
@@ -95,20 +77,6 @@ struct SnotchApp: App {
             // stop logging "Internal inconsistency in menus" warnings.
             CommandMenu("Format") {
                 EmptyView()
-            }
-            CommandMenu("License") {
-                Button("Manage License") {
-                    showManageLicense = true
-                }
-                .keyboardShortcut("l", modifiers: [.command, .shift])
-
-                Button("Revalidate License") {
-                    Task { _ = await licenseManager.validateCurrentLicense(force: true) }
-                }
-
-                Button("Deactivate License") {
-                    licenseManager.deactivate()
-                }
             }
         }
     }

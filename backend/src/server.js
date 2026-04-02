@@ -109,28 +109,13 @@ function addHours(hours) {
 }
 
 function requireAuth(req, res, next) {
-  if (req.isAdmin && ADMIN_BYPASS_UNLIMITED) {
-    req.license = {
-      admin: true,
-      role: "admin",
-      deviceId: req.headers["x-device-id"] || "admin-device",
-    };
-    return next();
-  }
-
-  const auth = req.headers.authorization || "";
-  if (!auth.startsWith("Bearer ")) {
-    return res.status(401).json({ ok: false, message: "Missing bearer token" });
-  }
-
-  try {
-    const token = auth.slice("Bearer ".length);
-    const payload = verifyToken(token);
-    req.license = payload;
-    return next();
-  } catch {
-    return res.status(401).json({ ok: false, message: "Invalid token" });
-  }
+  // License system removed - all requests allowed
+  req.license = {
+    noAuth: true,
+    role: "user",
+    deviceId: req.headers["x-device-id"] || "no-auth-device",
+  };
+  return next();
 }
 
 function requireAdmin(req, res, next) {
@@ -180,6 +165,8 @@ app.post("/v1/admin/auth", validateLimiter, (req, res) => {
   return res.json({ ok: true, message: "Admin authenticated" });
 });
 
+// License endpoints removed - system no longer uses license keys
+/*
 app.post("/v1/license/activate", activationLimiter, (req, res) => {
   const { licenseKey, deviceId, deviceName, appVersion, platform } = req.body || {};
   if (!licenseKey || !deviceId || !appVersion || !platform) {
@@ -259,7 +246,10 @@ app.post("/v1/license/activate", activationLimiter, (req, res) => {
     message: "Activated",
   });
 });
+*/
 
+// License validation endpoint removed
+/*
 app.post("/v1/license/validate", validateLimiter, (req, res) => {
   const { token, licenseKey, deviceId, deviceName, appVersion, platform } = req.body || {};
   if (!token || !licenseKey || !deviceId || !appVersion || !platform) {
@@ -315,6 +305,7 @@ app.post("/v1/license/validate", validateLimiter, (req, res) => {
     message: "Valid",
   });
 });
+*/
 
 app.post("/v1/generate/script", generateLimiter, requireAuth, async (req, res) => {
   if (!OPENAI_API_KEY) {

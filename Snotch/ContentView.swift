@@ -302,7 +302,6 @@ final class StyleCaptureRecorder: NSObject, ObservableObject {
 struct ContentView: View {
 
     @StateObject private var store = ScriptStore()
-    @ObservedObject var licenseManager: LicenseManager
     @ObservedObject var speechManager: SpeechManager
     @ObservedObject var overlayController: OverlayWindowController
 
@@ -664,31 +663,53 @@ struct ContentView: View {
                         .padding(.bottom, 10)
                 }
 
-                // Body lines — keep the same teleprompter layout whether playing or paused.
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(alignment: .leading, spacing: 10) {
                             ForEach(Array(speechManager.scriptLines.enumerated()), id: \.offset) { index, line in
-                                Text(line)
+                                if speechManager.isListening || speechManager.isCountingDown {
+                                    Text(line)
+                                        .font(.system(size: fontSize, weight: .light))
+                                        .foregroundColor(Color(white: pillLight ? 0.10 : 0.88))
+                                        .padding(.vertical, 4)
+                                        .padding(.horizontal, 8)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                                .fill(Color(white: pillLight ? 0 : 1, opacity: speechManager.isListening && index == speechManager.currentLineIndex ? 0.12 : 0.0))
+                                        )
+                                        .shadow(
+                                            color: Color(white: pillLight ? 0 : 1, opacity: speechManager.isListening && index == speechManager.currentLineIndex ? 0.20 : 0.0),
+                                            radius: 10, x: 0, y: 0
+                                        )
+                                        .id(index)
+                                } else {
+                                    TextField(
+                                        "",
+                                        text: Binding(
+                                            get: {
+                                                guard speechManager.scriptLines.indices.contains(index) else { return "" }
+                                                return speechManager.scriptLines[index]
+                                            },
+                                            set: { newValue in
+                                                updateScriptLine(at: index, with: newValue)
+                                            }
+                                        )
+                                    )
+                                    .textFieldStyle(.plain)
                                     .font(.system(size: fontSize, weight: .light))
                                     .foregroundColor(Color(white: pillLight ? 0.10 : 0.88))
                                     .padding(.vertical, 4)
                                     .padding(.horizontal, 8)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                            .fill(Color(white: pillLight ? 0 : 1, opacity: speechManager.isListening && index == speechManager.currentLineIndex ? 0.12 : 0.0))
-                                    )
-                                    .shadow(
-                                        color: Color(white: pillLight ? 0 : 1, opacity: speechManager.isListening && index == speechManager.currentLineIndex ? 0.20 : 0.0),
-                                        radius: 10, x: 0, y: 0
-                                    )
+                                    .background(Color.clear)
                                     .id(index)
+                                }
                             }
                         }
                         .padding(.horizontal, hPad)
                         .padding(.bottom, 48)
                     }
                     .onReceive(speechManager.$currentLineIndex.removeDuplicates()) { idx in
+                        guard speechManager.isListening || speechManager.isCountingDown else { return }
                         withAnimation(.easeInOut(duration: 0.25)) {
                             proxy.scrollTo(idx, anchor: .center)
                         }
@@ -944,6 +965,20 @@ struct ContentView: View {
         }
     }
 
+    private func updateScriptLine(at index: Int, with newValue: String) {
+        guard var script = editingScript else { return }
+        var lines = speechManager.scriptLines
+        guard lines.indices.contains(index) else { return }
+        lines[index] = newValue
+        let merged = lines.joined(separator: "\n")
+        let normalized = normalizeEditorInput(previous: script.body, incoming: merged)
+        script.body = normalized
+        script.lastEdited = Date()
+        editingScript = script
+        store.update(script)
+        speechManager.loadScript(normalized)
+    }
+
     private func handleImport(_ result: Result<[URL], Error>) {
         guard case .success(let urls) = result, let url = urls.first else { return }
         guard let content = importedText(from: url) else { return }
@@ -1148,10 +1183,6 @@ struct ContentView: View {
 
     private func applyGeneratedScriptWithGPT() async -> Bool {
         guard var script = editingScript else { return false }
-        guard let token = licenseManager.activationSummary()?.token, !token.isEmpty else {
-            generatorErrorMessage = "License token missing. Re-activate your license."
-            return false
-        }
 
         let targetMinutes: Double?
         if generatorSetLength {
@@ -1244,7 +1275,6 @@ struct ContentView: View {
 
         do {
             let generated = try await generateScriptWithBackend(
-                token: token,
                 topic: topic,
                 audience: audience.isEmpty ? "General audience" : audience,
                 tone: generatorTone,
@@ -1278,7 +1308,6 @@ struct ContentView: View {
     }
 
     private func generateScriptWithBackend(
-        token: String,
         topic: String,
         audience: String,
         tone: String,
@@ -1302,7 +1331,6 @@ struct ContentView: View {
         var request = URLRequest(url: URL(string: "\(backendBaseURL)/v1/generate/script")!)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONEncoder().encode(requestBody)
 
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -1383,20 +1411,8 @@ struct ContentView: View {
     }
 
     private func requestStyleCaptureTopic() async -> String {
-        guard let token = licenseManager.activationSummary()?.token, !token.isEmpty else {
-            return "Talk for 30 seconds about your favorite app and why you use it daily."
-        }
-
-        do {
-            var request = URLRequest(url: URL(string: "\(backendBaseURL)/v1/generate/bundles")!)
-            request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-            request.httpBody = try JSONEncoder().encode(BackendBundlesRequest(topic: "Personal speaking practice", audience: "General audience"))
-
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-                throw NSError(domain: "Snotch.Generator", code: -3)
+        return "Talk for 30 seconds about your favorite app and why you use it daily."
+    }
             }
 
             let decoded = try JSONDecoder().decode(BackendBundlesResponse.self, from: data)
