@@ -131,10 +131,10 @@ struct AudioWaveView: View {
                 let cx = size.width / 2
                 let baseY  = size.height
                 
-                // Multiple wave layers with different frequencies
-                let wave1 = sin(t * 2.4 + wavePhase) * 0.025
-                let wave2 = sin(t * 3.7 + wavePhase * 1.3) * 0.018
-                let wave3 = sin(t * 5.2 + wavePhase * 0.8) * 0.012
+                // Multiple wave layers with different frequencies (subtle)
+                let wave1 = sin(t * 2.4 + wavePhase) * 0.008
+                let wave2 = sin(t * 3.7 + wavePhase * 1.3) * 0.006
+                let wave3 = sin(t * 5.2 + wavePhase * 0.8) * 0.004
                 let combinedWave = (wave1 + wave2 + wave3) * level
                 
                 let breath = 1.0 + combinedWave
@@ -150,8 +150,8 @@ struct AudioWaveView: View {
                     let baseX = cx + cos(angle + .pi) * radius
                     let baseHeight = sin(angle) * radius
                     
-                    // Add wave distortion to height
-                    let waveInfluence = sin(angle * 3.0 + t * 4.5) * 0.04 * level
+                    // Add subtle wave distortion to height
+                    let waveInfluence = sin(angle * 3.0 + t * 4.5) * 0.015 * level
                     let height = baseHeight * (1.0 + waveInfluence)
                     
                     let y = baseY - height
@@ -175,7 +175,7 @@ struct AudioWaveView: View {
                         let baseX = cx + cos(angle + .pi) * layerRadius
                         let baseHeight = sin(angle) * layerRadius
                         
-                        let waveOffset = sin(angle * 2.0 + t * 3.8 - Double(layer) * 0.5) * 0.03 * level
+                        let waveOffset = sin(angle * 2.0 + t * 3.8 - Double(layer) * 0.5) * 0.012 * level
                         let height = baseHeight * (1.0 + waveOffset)
                         
                         let y = baseY - height
@@ -237,8 +237,8 @@ struct AudioWaveView: View {
                     ))
                 }
 
-                // Bright core with wave animation
-                let coreR = radius * (0.36 + sin(t * 3.2) * 0.04 * level)
+                // Bright core with subtle wave animation
+                let coreR = radius * (0.36 + sin(t * 3.2) * 0.015 * level)
                 var waveCore = Path()
                 waveCore.move(to: CGPoint(x: cx - coreR, y: baseY))
                 
@@ -247,7 +247,7 @@ struct AudioWaveView: View {
                     let baseX = cx + cos(angle + .pi) * coreR
                     let baseHeight = sin(angle) * coreR
                     
-                    let microWave = sin(angle * 4.0 + t * 6.0) * 0.06 * level
+                    let microWave = sin(angle * 4.0 + t * 6.0) * 0.02 * level
                     let height = baseHeight * (1.0 + microWave)
                     
                     let y = baseY - height
