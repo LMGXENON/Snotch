@@ -112,12 +112,13 @@ final class OverlayWindowController: ObservableObject {
     }
 }
 
-// MARK: - Aurora bloom visualiser
+// MARK: - Advanced Wave Visualizer
 
 struct AudioWaveView: View {
     let audioLevel: Float
     let lightMode: Bool
     @State private var smoothed: Double = 0
+    @State private var wavePhase: Double = 0
 
     var body: some View {
         TimelineView(.animation) { tl in
@@ -129,80 +130,149 @@ struct AudioWaveView: View {
 
                 let cx = size.width / 2
                 let baseY  = size.height
-                let breath = 1.0 + sin(t * 1.4) * 0.03 * level
+                
+                // Multiple wave layers with different frequencies
+                let wave1 = sin(t * 2.4 + wavePhase) * 0.025
+                let wave2 = sin(t * 3.7 + wavePhase * 1.3) * 0.018
+                let wave3 = sin(t * 5.2 + wavePhase * 0.8) * 0.012
+                let combinedWave = (wave1 + wave2 + wave3) * level
+                
+                let breath = 1.0 + combinedWave
                 let radius = size.width * 0.48 * level * breath
 
-                var dome = Path()
-                dome.move(to: CGPoint(x: cx - radius, y: baseY))
-                dome.addArc(
-                    center:     CGPoint(x: cx, y: baseY),
-                    radius:     radius,
-                    startAngle: .degrees(180),
-                    endAngle:   .degrees(0),
-                    clockwise:  false
-                )
-                dome.addLine(to: CGPoint(x: cx + radius, y: baseY))
-                dome.closeSubpath()
+                // Main dome with wave distortion
+                var wavyDome = Path()
+                wavyDome.move(to: CGPoint(x: cx - radius, y: baseY))
+                
+                let segments = 60
+                for i in 0...segments {
+                    let angle = Double(i) / Double(segments) * .pi
+                    let baseX = cx + cos(angle + .pi) * radius
+                    let baseHeight = sin(angle) * radius
+                    
+                    // Add wave distortion to height
+                    let waveInfluence = sin(angle * 3.0 + t * 4.5) * 0.04 * level
+                    let height = baseHeight * (1.0 + waveInfluence)
+                    
+                    let y = baseY - height
+                    wavyDome.addLine(to: CGPoint(x: baseX, y: y))
+                }
+                
+                wavyDome.addLine(to: CGPoint(x: cx + radius, y: baseY))
+                wavyDome.closeSubpath()
 
+                // Outer glow layers with wave animation
+                for layer in 0..<3 {
+                    let layerScale = 1.0 + Double(layer) * 0.15
+                    let layerOpacity = (1.0 - Double(layer) * 0.3) * level
+                    let layerRadius = radius * layerScale
+                    
+                    var glowDome = Path()
+                    glowDome.move(to: CGPoint(x: cx - layerRadius, y: baseY))
+                    
+                    for i in 0...segments {
+                        let angle = Double(i) / Double(segments) * .pi
+                        let baseX = cx + cos(angle + .pi) * layerRadius
+                        let baseHeight = sin(angle) * layerRadius
+                        
+                        let waveOffset = sin(angle * 2.0 + t * 3.8 - Double(layer) * 0.5) * 0.03 * level
+                        let height = baseHeight * (1.0 + waveOffset)
+                        
+                        let y = baseY - height
+                        glowDome.addLine(to: CGPoint(x: baseX, y: y))
+                    }
+                    
+                    glowDome.addLine(to: CGPoint(x: cx + layerRadius, y: baseY))
+                    glowDome.closeSubpath()
+                    
+                    if lightMode {
+                        ctx.fill(glowDome, with: .radialGradient(
+                            Gradient(colors: [
+                                Color(white: 0.00).opacity(0.08 * layerOpacity),
+                                .clear,
+                            ]),
+                            center: CGPoint(x: cx, y: baseY),
+                            startRadius: 0,
+                            endRadius: layerRadius
+                        ))
+                    } else {
+                        ctx.fill(glowDome, with: .radialGradient(
+                            Gradient(colors: [
+                                Color(white: 1.00).opacity(0.12 * layerOpacity),
+                                .clear,
+                            ]),
+                            center: CGPoint(x: cx, y: baseY),
+                            startRadius: 0,
+                            endRadius: layerRadius
+                        ))
+                    }
+                }
+
+                // Main dome with enhanced gradients
                 if lightMode {
-                    // Light pill: dark gray dome on white background
-                    ctx.fill(dome, with: .radialGradient(
+                    ctx.fill(wavyDome, with: .radialGradient(
                         Gradient(stops: [
-                            .init(color: Color(white: 0.00).opacity(0.28 * level), location: 0.00),
-                            .init(color: Color(white: 0.15).opacity(0.16 * level), location: 0.40),
-                            .init(color: Color(white: 0.30).opacity(0.06 * level), location: 0.72),
+                            .init(color: Color(white: 0.00).opacity(0.32 * level), location: 0.00),
+                            .init(color: Color(white: 0.12).opacity(0.22 * level), location: 0.35),
+                            .init(color: Color(white: 0.25).opacity(0.10 * level), location: 0.65),
+                            .init(color: Color(white: 0.35).opacity(0.04 * level), location: 0.85),
                             .init(color: .clear,                                   location: 1.00),
                         ]),
                         center:      CGPoint(x: cx, y: baseY),
                         startRadius: 0,
                         endRadius:   radius
                     ))
-                    let coreR = radius * 0.36
-                    var core  = Path()
-                    core.move(to: CGPoint(x: cx - coreR, y: baseY))
-                    core.addArc(
-                        center: CGPoint(x: cx, y: baseY),
-                        radius: coreR, startAngle: .degrees(180),
-                        endAngle: .degrees(0), clockwise: false
-                    )
-                    core.addLine(to: CGPoint(x: cx + coreR, y: baseY))
-                    core.closeSubpath()
-                    ctx.fill(core, with: .radialGradient(
+                } else {
+                    ctx.fill(wavyDome, with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: Color(white: 1.00).opacity(0.65 * level), location: 0.00),
+                            .init(color: Color(white: 0.88).opacity(0.45 * level), location: 0.30),
+                            .init(color: Color(white: 0.70).opacity(0.22 * level), location: 0.60),
+                            .init(color: Color(white: 0.50).opacity(0.08 * level), location: 0.82),
+                            .init(color: .clear,                                   location: 1.00),
+                        ]),
+                        center:      CGPoint(x: cx, y: baseY),
+                        startRadius: 0,
+                        endRadius:   radius
+                    ))
+                }
+
+                // Bright core with wave animation
+                let coreR = radius * (0.36 + sin(t * 3.2) * 0.04 * level)
+                var waveCore = Path()
+                waveCore.move(to: CGPoint(x: cx - coreR, y: baseY))
+                
+                for i in 0...40 {
+                    let angle = Double(i) / 40.0 * .pi
+                    let baseX = cx + cos(angle + .pi) * coreR
+                    let baseHeight = sin(angle) * coreR
+                    
+                    let microWave = sin(angle * 4.0 + t * 6.0) * 0.06 * level
+                    let height = baseHeight * (1.0 + microWave)
+                    
+                    let y = baseY - height
+                    waveCore.addLine(to: CGPoint(x: baseX, y: y))
+                }
+                
+                waveCore.addLine(to: CGPoint(x: cx + coreR, y: baseY))
+                waveCore.closeSubpath()
+                
+                if lightMode {
+                    ctx.fill(waveCore, with: .radialGradient(
                         Gradient(colors: [
-                            Color(white: 0.00).opacity(0.45 * level),
-                            Color(white: 0.10).opacity(0.22 * level),
+                            Color(white: 0.00).opacity(0.55 * level),
+                            Color(white: 0.08).opacity(0.28 * level),
                             .clear,
                         ]),
                         center: CGPoint(x: cx, y: baseY),
                         startRadius: 0, endRadius: coreR
                     ))
                 } else {
-                    // Dark pill: white dome
-                    ctx.fill(dome, with: .radialGradient(
-                        Gradient(stops: [
-                            .init(color: Color(white: 1.00).opacity(0.55 * level), location: 0.00),
-                            .init(color: Color(white: 0.85).opacity(0.35 * level), location: 0.35),
-                            .init(color: Color(white: 0.60).opacity(0.12 * level), location: 0.68),
-                            .init(color: .clear,                                   location: 1.00),
-                        ]),
-                        center:      CGPoint(x: cx, y: baseY),
-                        startRadius: 0,
-                        endRadius:   radius
-                    ))
-                    let coreR = radius * 0.36
-                    var core  = Path()
-                    core.move(to: CGPoint(x: cx - coreR, y: baseY))
-                    core.addArc(
-                        center: CGPoint(x: cx, y: baseY),
-                        radius: coreR, startAngle: .degrees(180),
-                        endAngle: .degrees(0), clockwise: false
-                    )
-                    core.addLine(to: CGPoint(x: cx + coreR, y: baseY))
-                    core.closeSubpath()
-                    ctx.fill(core, with: .radialGradient(
+                    ctx.fill(waveCore, with: .radialGradient(
                         Gradient(colors: [
-                            Color(white: 1.00).opacity(0.92 * level),
-                            Color(white: 0.90).opacity(0.50 * level),
+                            Color(white: 1.00).opacity(0.95 * level),
+                            Color(white: 0.92).opacity(0.65 * level),
+                            Color(white: 0.80).opacity(0.25 * level),
                             .clear,
                         ]),
                         center: CGPoint(x: cx, y: baseY),
@@ -213,6 +283,7 @@ struct AudioWaveView: View {
             .task(id: tl.date) {
                 let target = Double(min(audioLevel * 20.0, 1.0))
                 smoothed = smoothed + (target - smoothed) * (target > smoothed ? 0.28 : 0.05)
+                wavePhase += 0.08
             }
         }
     }
