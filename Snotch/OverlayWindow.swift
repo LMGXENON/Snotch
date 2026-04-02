@@ -112,7 +112,7 @@ final class OverlayWindowController: ObservableObject {
     }
 }
 
-// MARK: - Minimal Futuristic Visualizer
+// MARK: - Concentrated Glow Visualizer
 
 struct AudioWaveView: View {
     let audioLevel: Float
@@ -132,41 +132,32 @@ struct AudioWaveView: View {
                 let cx = size.width / 2
                 let baseY  = size.height
                 
-                // Subtle wave animation
-                let wave1 = sin(t * 2.4 + wavePhase) * 0.008
-                let wave2 = sin(t * 3.7 + wavePhase * 1.3) * 0.006
-                let wave3 = sin(t * 5.2 + wavePhase * 0.8) * 0.004
-                let combinedWave = (wave1 + wave2 + wave3) * level
+                // Subtle breathing animation
+                let breath = 1.0 + sin(t * 1.8) * 0.08 * level
                 
-                let breath = 1.0 + combinedWave
-                let radius = size.width * 0.48 * level * breath
+                // Much smaller, concentrated radius - tight glow
+                let radius = size.width * 0.25 * level * breath
 
-                // Smooth dome path
-                var dome = Path()
-                dome.move(to: CGPoint(x: cx - radius, y: baseY))
-                
-                let segments = 60
-                for i in 0...segments {
-                    let angle = Double(i) / Double(segments) * .pi
-                    let baseX = cx + cos(angle + .pi) * radius
-                    let baseHeight = sin(angle) * radius
-                    let waveInfluence = sin(angle * 3.0 + t * 4.5) * 0.015 * level
-                    let height = baseHeight * (1.0 + waveInfluence)
-                    let y = baseY - height
-                    dome.addLine(to: CGPoint(x: baseX, y: y))
-                }
-                
-                dome.addLine(to: CGPoint(x: cx + radius, y: baseY))
-                dome.closeSubpath()
+                // Simple arc path - compact and centered
+                var arc = Path()
+                arc.move(to: CGPoint(x: cx - radius, y: baseY))
+                arc.addArc(
+                    center: CGPoint(x: cx, y: baseY),
+                    radius: radius,
+                    startAngle: .degrees(180),
+                    endAngle: .degrees(0),
+                    clockwise: false
+                )
+                arc.addLine(to: CGPoint(x: cx + radius, y: baseY))
+                arc.closeSubpath()
 
-                // Soft white glowing dome - Apple style
                 if lightMode {
-                    // Light mode: soft gray dome
-                    ctx.fill(dome, with: .radialGradient(
+                    // Light mode: dark gray concentrated glow
+                    ctx.fill(arc, with: .radialGradient(
                         Gradient(stops: [
-                            .init(color: Color(white: 0.2).opacity(0.35 * level), location: 0.00),
-                            .init(color: Color(white: 0.3).opacity(0.20 * level), location: 0.45),
-                            .init(color: Color(white: 0.4).opacity(0.08 * level), location: 0.75),
+                            .init(color: Color(white: 0.15).opacity(0.55 * level), location: 0.00),
+                            .init(color: Color(white: 0.25).opacity(0.35 * level), location: 0.50),
+                            .init(color: Color(white: 0.35).opacity(0.15 * level), location: 0.80),
                             .init(color: .clear, location: 1.00),
                         ]),
                         center: CGPoint(x: cx, y: baseY),
@@ -174,13 +165,13 @@ struct AudioWaveView: View {
                         endRadius: radius
                     ))
                 } else {
-                    // Dark mode: bright white glowing dome
-                    ctx.fill(dome, with: .radialGradient(
+                    // Dark mode: tight grayish-white glow (not spread out)
+                    ctx.fill(arc, with: .radialGradient(
                         Gradient(stops: [
-                            .init(color: Color.white.opacity(0.75 * level), location: 0.00),
-                            .init(color: Color.white.opacity(0.50 * level), location: 0.40),
-                            .init(color: Color.white.opacity(0.25 * level), location: 0.70),
-                            .init(color: Color.white.opacity(0.08 * level), location: 0.90),
+                            .init(color: Color(white: 0.95).opacity(0.85 * level), location: 0.00),
+                            .init(color: Color(white: 0.85).opacity(0.65 * level), location: 0.40),
+                            .init(color: Color(white: 0.75).opacity(0.35 * level), location: 0.70),
+                            .init(color: Color(white: 0.65).opacity(0.12 * level), location: 0.88),
                             .init(color: .clear, location: 1.00),
                         ]),
                         center: CGPoint(x: cx, y: baseY),
@@ -188,24 +179,25 @@ struct AudioWaveView: View {
                         endRadius: radius
                     ))
                     
-                    // Bright core for extra glow
-                    let coreRadius = radius * 0.5
+                    // Bright focused core - very tight
+                    let coreRadius = radius * 0.45
                     var core = Path()
                     core.move(to: CGPoint(x: cx - coreRadius, y: baseY))
-                    for i in 0...40 {
-                        let angle = Double(i) / 40.0 * .pi
-                        let x = cx + cos(angle + .pi) * coreRadius
-                        let y = baseY - sin(angle) * coreRadius
-                        core.addLine(to: CGPoint(x: x, y: y))
-                    }
+                    core.addArc(
+                        center: CGPoint(x: cx, y: baseY),
+                        radius: coreRadius,
+                        startAngle: .degrees(180),
+                        endAngle: .degrees(0),
+                        clockwise: false
+                    )
                     core.addLine(to: CGPoint(x: cx + coreRadius, y: baseY))
                     core.closeSubpath()
                     
                     ctx.fill(core, with: .radialGradient(
-                        Gradient(colors: [
-                            Color.white.opacity(0.9 * level),
-                            Color.white.opacity(0.6 * level),
-                            .clear,
+                        Gradient(stops: [
+                            .init(color: Color.white.opacity(0.95 * level), location: 0.00),
+                            .init(color: Color(white: 0.90).opacity(0.75 * level), location: 0.60),
+                            .init(color: .clear, location: 1.00),
                         ]),
                         center: CGPoint(x: cx, y: baseY),
                         startRadius: 0,
