@@ -5,8 +5,6 @@
     Speak exactly how you meant it.
     <br />
     A free, open-source teleprompter that scrolls with your voice and keeps your eyes on the camera.
-    <br />
-    <a href="https://www.snotch.app" target="_blank" rel="noopener noreferrer" style="color: #fff; text-decoration: none; font-weight: 500;">Visit Website</a>
     <br /><br />
     <a href="/downloads/Snotch-1.0.dmg">
       <img src="https://img.shields.io/badge/Download-macOS-000?style=for-the-badge&logo=apple&logoColor=white&labelColor=333" height="54" alt="Download for macOS" />
@@ -15,6 +13,8 @@
     <a href="https://www.producthunt.com/products/snotch?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-snotch" target="_blank" rel="noopener noreferrer">
       <img alt="Snotch on Product Hunt" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1135212&theme=dark&t=1777474048604" />
     </a>
+    <br /><br />
+    <a href="https://www.snotch.app" target="_blank" rel="noopener noreferrer" style="color: #fff; text-decoration: none; font-weight: 500; font-size: 16px;">→ Visit Website</a>
   </p>
 </p>
 
