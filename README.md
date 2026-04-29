@@ -4,7 +4,7 @@
   </a>
   <h1 align="center"><b>Snotch — AI Teleprompter for macOS</b></h1>
   <p align="center">
-    Speak exactly how you meant it.
+    Say it exactly how you meant it.
     <br />
     A free, open-source teleprompter that scrolls with your voice and keeps your eyes on the camera.
     <br /><br />
