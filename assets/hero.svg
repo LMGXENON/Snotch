@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="640" viewBox="0 0 1200 640">
+  <rect width="1200" height="640" fill="#0f1113"/>
+  <rect x="120" y="90" rx="18" ry="18" width="960" height="420" fill="#1f2225" stroke="#2b2f33" stroke-width="2"/>
+  <rect x="420" y="40" rx="8" ry="8" width="360" height="60" fill="#0b0d0f"/>
+  <text x="600" y="80" fill="#cfcfcf" font-size="20" font-family="Helvetica, Arial, sans-serif" text-anchor="middle">Snotch — your invisible notch prompter</text>
+  <rect x="160" y="150" width="880" height="260" rx="10" fill="#0b0c0d" />
+  <text x="200" y="190" fill="#e6e6e6" font-size="28" font-family="Georgia, serif">Get Started</text>
+  <text x="200" y="230" fill="#a9a9a9" font-size="18" font-family="Helvetica, Arial, sans-serif">Welcome to Snotch, your personal teleprompter. Start speaking and watch the text follow your voice.</text>
+  <rect x="520" y="270" width="40" height="40" rx="6" fill="#2ecc71"/>
+  <circle cx="560" cy="290" r="20" fill="#ffffff" opacity="0.08"/>
+</svg>

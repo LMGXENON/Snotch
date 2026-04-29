@@ -1,9 +1,16 @@
 # Snotch
 
+<p align="center">
+	<img src="assets/1024.png" alt="Snotch logo" width="160" />
+</p>
+
 Snotch is an open-source teleprompter for macOS that follows your voice and presents a clean, notch-style overlay for on-camera scripts. It’s designed for creators who want precise, natural-paced delivery while recording or presenting.
 
-Website: https://www.snotch.app/
-Product Hunt: https://www.producthunt.com/products/snotch
+Website: https://www.snotch.app/  •  Product Hunt: https://www.producthunt.com/products/snotch
+
+<p align="center">
+	<img src="assets/phmain.png" alt="Snotch hero screenshot" width="800" />
+</p>
 
 Highlights
  - Voice-synced scrolling that follows speaking cadence
