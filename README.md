@@ -16,7 +16,6 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-macOS-lightgrey)](https://www.snotch.app/)
 [![Free Forever](https://img.shields.io/badge/free-forever-brightgreen)](https://www.snotch.app/)
-[![Product Hunt](https://img.shields.io/badge/Product%20Hunt-featured-orange)](https://www.producthunt.com/posts/snotch)
 
 <p align="center">
   <img src="/assets/phmain.png" alt="Snotch demo" width="900" />
@@ -29,6 +28,8 @@ Snotch sits near your camera and scrolls as you speak. It's built around one pro
 Tucked into the notch, it keeps your script as close to the lens as possible so eye contact stays real. Everything runs locally. Nothing leaves your machine.
 
 No cloud. No API keys. No subscriptions.
+
+<a href="https://www.producthunt.com/products/snotch?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-snotch" target="_blank" rel="noopener noreferrer"><img alt="Snotch - AI teleprompter that lets you speak exactly how you meant it | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1135212&theme=dark&t=1777474048604"></a>
 
 ---
 
