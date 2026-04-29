@@ -5,6 +5,8 @@
     Speak exactly how you meant it.
     <br />
     A free, open-source teleprompter that scrolls with your voice and keeps your eyes on the camera.
+    <br />
+    <a href="https://www.snotch.app" target="_blank" rel="noopener noreferrer" style="color: #fff; text-decoration: none; font-weight: 500;">Visit Website</a>
     <br /><br />
     <a href="/downloads/Snotch-1.0.dmg">
       <img src="https://img.shields.io/badge/Download-macOS-000?style=for-the-badge&logo=apple&logoColor=white&labelColor=333" height="54" alt="Download for macOS" />
@@ -28,8 +30,6 @@
   <img src="/assets/phmain.png" alt="Snotch demo" width="900" />
 </p>
 
-**How to use Snotch:** [https://www.snotch.app/](https://www.snotch.app/)
-
 Snotch is built around one simple problem: sounding natural on camera when you have a script. Fixed-speed teleprompters force you to keep pace with a timer. Snotch listens to your voice and scrolls with you — moving when you talk, settling when you pause. Your script stays tucked in the notch, keeping eye contact real and your eyeline close to the lens.
 
 Everything runs locally. Nothing leaves your machine. No cloud. No API keys. No subscriptions.
@@ -40,14 +40,14 @@ Everything runs locally. Nothing leaves your machine. No cloud. No API keys. No 
 
 | Feature | Description |
 | :--- | :--- |
-| 🎤 **Voice Follow** | Scrolls with your speech in real-time — moves when you talk, pauses when you do. |
-| ✨ **AI Script Generation** | Generate and edit scripts directly from the overlay without switching apps. |
-| 👁️ **Invisible During Capture** | Stays out of screen recordings and video calls while you present. |
-| 🎯 **Smooth Motion** | Spring-based scrolling tuned to feel natural and easy to track. |
-| 🔒 **Offline Processing** | All audio processing stays on your machine — zero cloud transcription, zero data sent. |
-| 📄 **Document Import** | Load `.txt`, `.pdf`, or `.docx` files from the menu or drag them straight onto Snotch. |
-| 🎮 **Two Modes** | Voice mode tracks you automatically, or Manual mode for fixed-pace control. |
-| 📌 **Always Visible** | Pins near your webcam so your eyes stay naturally trained on the lens. |
+| **Voice Follow** | Scrolls with your speech in real-time — moves when you talk, pauses when you do. |
+| **AI Script Generation** | Generate and edit scripts directly from the overlay without switching apps. |
+| **Invisible During Capture** | Stays out of screen recordings and video calls while you present. |
+| **Smooth Motion** | Spring-based scrolling tuned to feel natural and easy to track. |
+| **Offline Processing** | All audio processing stays on your machine — zero cloud transcription, zero data sent. |
+| **Document Import** | Load `.txt`, `.pdf`, or `.docx` files from the menu or drag them straight onto Snotch. |
+| **Two Modes** | Voice mode tracks you automatically, or Manual mode for fixed-pace control. |
+| **Always Visible** | Pins near your webcam so your eyes stay naturally trained on the lens. |
 
 ---
 
@@ -67,12 +67,6 @@ Everything runs locally. Nothing leaves your machine. No cloud. No API keys. No 
 2. **Position** — Minimize into the pill and position it near your webcam.
 3. **Pick Your Mode** — Choose **Voice mode** (automatic) or **Manual mode** (fixed pace) from settings.
 4. **Fine-tune** — Adjust font, theme, opacity, sensitivity, and more anytime.
-
----
-
-## Privacy
-
-Everything runs on your machine. Snotch was built for offline use from the start — no cloud transcription, no accounts, no telemetry. Your script and your voice stay yours.
 
 ---
 
