@@ -5,11 +5,25 @@
 </p>
 
 Snotch is an open-source teleprompter for macOS that follows your voice and presents a clean, notch-style overlay for on-camera scripts. It’s designed for creators who want precise, natural-paced delivery while recording or presenting.
-
-Website: https://www.snotch.app/  •  Product Hunt: https://www.producthunt.com/products/snotch
-
 <p align="center">
-	<img src="assets/phmain.png" alt="Snotch hero screenshot" width="800" />
+	<img src="assets/logo.svg" alt="Snotch Logo" width="150" />
+	<h1 style="margin-top:12px;">Snotch — Smart Teleprompter for macOS</h1>
+	<p style="max-width:760px; margin:8px auto; color:#666;">
+		A local, offline teleprompter that follows your voice. Built for creators, presenters, interviews, meetings, and live delivery.
+		<br />
+		<strong>Downloads for</strong>
+		<a href="/Snotch-1.0.dmg">macOS</a>
+	</p>
+
+	<p>
+		<a href="https://www.snotch.app/" target="_blank" rel="noopener noreferrer"><img src="assets/1024.png" alt="Website" width="36" style="vertical-align:middle; margin-right:8px;"> Visit Website</a>
+		&nbsp;&nbsp;•&nbsp;&nbsp;
+		<a href="https://www.producthunt.com/products/snotch" target="_blank" rel="noopener noreferrer"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1135212&amp;theme=dark" alt="Product Hunt" width="120" style="vertical-align:middle; margin-right:8px;"></a>
+	</p>
+
+	<p align="center">
+		<img src="assets/hero.svg" alt="Snotch demo" width="900" />
+	</p>
 </p>
 
 Highlights
@@ -21,14 +35,14 @@ Highlights
 
 Quick links
  - App: `Snotch/Snotch.app` (build with Xcode)
-
 Badges
 
-<a href="https://www.snotch.app/" target="_blank" rel="noopener noreferrer"><img src="https://www.snotch.app/favicon.ico" alt="Snotch website" width="64" height="64"></a>
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-macOS-lightgrey)](https://www.snotch.app/)
 
-Product Hunt
-
-<a href="https://www.producthunt.com/products/snotch?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-snotch" target="_blank" rel="noopener noreferrer"><img alt="Snotch - AI teleprompter that lets you speak exactly how you meant it | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1135212&amp;theme=dark&amp;t=1777474048604"></a>
+<p align="center">
+	<img src="assets/hero.svg" alt="Snotch demo" width="900" />
+</p>
 
 Installation (Developer)
 1. Clone the repository:
@@ -76,6 +90,13 @@ Contact
 
 ---
 _This README was updated to reflect that backend and license-server code has been removed for this open-source release._
+
+How to Use (Quick)
+------------------
+
+1. Open the app, paste your script or import a file.
+2. Minimize the editor into the notch overlay and position near your webcam.
+3. Toggle Voice mode and start speaking — the text will follow your voice in natural timing.
 
 Product Hunt & Website Copy
 ---------------------------
