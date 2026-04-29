@@ -22,7 +22,7 @@ Snotch is an open-source teleprompter for macOS that follows your voice and pres
 	</p>
 
 	<p align="center">
-		<img src="assets/hero.svg" alt="Snotch demo" width="900" />
+		<img src="assets/1024.png" alt="Snotch demo" width="900" />
 	</p>
 </p>
 
@@ -41,7 +41,7 @@ Badges
 [![Platform](https://img.shields.io/badge/platform-macOS-lightgrey)](https://www.snotch.app/)
 
 <p align="center">
-	<img src="assets/hero.svg" alt="Snotch demo" width="900" />
+	<img src="assets/1024.png" alt="Snotch demo" width="900" />
 </p>
 
 Installation (Developer)
@@ -66,7 +66,6 @@ open Snotch.xcodeproj
 ```
 
 Notes
- - This repository no longer contains a running backend server or license key server. Any previously included server code or CSV exports were removed to simplify the open-source distribution.
  - This repository no longer contains a running backend server or license key server. Any previously included server code or CSV exports were removed to simplify the open-source distribution.
 
 Contributing
