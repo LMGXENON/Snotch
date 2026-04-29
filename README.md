@@ -25,7 +25,7 @@
 </p>
 
 <p align="center">
-  <img src="/assets/phmain.png" alt="Snotch demo" width="900" style="border: 1px solid #333; border-radius: 8px;" />
+  <img src="/assets/phmain.png" alt="Snotch demo" width="900" style="border: 1px solid #333; border-radius: 16px;" />
 </p>
 
 Snotch is built around one simple problem: sounding natural on camera when you have a script. Fixed-speed teleprompters force you to keep pace with a timer. Snotch listens to your voice and scrolls with you — moving when you talk, settling when you pause. Your script stays tucked in the notch, keeping eye contact real and your eyeline close to the lens.
