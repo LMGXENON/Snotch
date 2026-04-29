@@ -14,7 +14,14 @@ Highlights
 
 Quick links
  - App: `Snotch/Snotch.app` (build with Xcode)
- - Landing page: `landing page/` (static demo)
+
+Badges
+
+<a href="https://www.snotch.app/" target="_blank" rel="noopener noreferrer"><img src="https://www.snotch.app/favicon.ico" alt="Snotch website" width="64" height="64"></a>
+
+Product Hunt
+
+<a href="https://www.producthunt.com/products/snotch?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-snotch" target="_blank" rel="noopener noreferrer"><img alt="Snotch - AI teleprompter that lets you speak exactly how you meant it | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1135212&amp;theme=dark&amp;t=1777474048604"></a>
 
 Installation (Developer)
 1. Clone the repository:
@@ -39,13 +46,7 @@ open Snotch.xcodeproj
 
 Notes
  - This repository no longer contains a running backend server or license key server. Any previously included server code or CSV exports were removed to simplify the open-source distribution.
- - If you need to run the landing page locally for preview, serve the `landing page/` directory with a static server:
-
-```bash
-cd "landing page"
-python3 -m http.server 5500
-# then open: http://localhost:5500
-```
+ - This repository no longer contains a running backend server or license key server. Any previously included server code or CSV exports were removed to simplify the open-source distribution.
 
 Contributing
 We welcome contributions. To contribute:
@@ -91,5 +92,5 @@ How to publish this project on Product Hunt
 2. Paste the two-sentence summary into the tagline/intro box.
 3. Use the longer blurb as the project description/details.
 4. Attach 1–2 screenshots showing the notch overlay and the in-app editor.
-5. Add suggested tags above and link to the GitHub repo and the landing page.
+5. Add suggested tags above and link to the GitHub repo and the website.
 
