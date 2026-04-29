@@ -6,9 +6,10 @@
     <br />
     A free, open-source teleprompter that scrolls with your voice and keeps your eyes on the camera.
     <br /><br />
-    <b>Download for </b>
-    <a href="/Snotch-1.0.dmg">macOS</a>
-    <br /><br />
+    <a href="/Snotch-1.0.dmg">
+      <img alt="Download for macOS" width="250" height="54" src="https://img.shields.io/badge/⬇%20Download-macOS-000000?style=for-the-badge&logo=apple&logoColor=white&logoSize=auto" />
+    </a>
+    &nbsp;&nbsp;
     <a href="https://www.producthunt.com/products/snotch?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-snotch" target="_blank" rel="noopener noreferrer">
       <img alt="Snotch - AI teleprompter that lets you speak exactly how you meant it | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1135212&theme=dark&t=1777474048604">
     </a>
