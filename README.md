@@ -15,35 +15,12 @@ Snotch is an open-source teleprompter for macOS that follows your voice and pres
 		<a href="/Snotch-1.0.dmg">macOS</a>
 	</p>
 
-	<p>
-		<a href="https://www.snotch.app/" target="_blank" rel="noopener noreferrer"><img src="assets/1024.png" alt="Website" width="36" style="vertical-align:middle; margin-right:8px;"> Visit Website</a>
-		&nbsp;&nbsp;•&nbsp;&nbsp;
-		<a href="https://www.producthunt.com/products/snotch" target="_blank" rel="noopener noreferrer"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1135212&amp;theme=dark" alt="Product Hunt" width="120" style="vertical-align:middle; margin-right:8px;"></a>
-	</p>
-
-	<p align="center">
-		<img src="assets/1024.png" alt="Snotch demo" width="900" />
-	</p>
 </p>
 
 <p align="center">
 	<img src="assets/1024.png" alt="Snotch logo" width="160" />
 
-	<h2 style="margin-top:12px; margin-bottom:6px;">Snotch — Voice-synced teleprompter for macOS</h2>
-
-	<!-- Website & Product Hunt buttons -->
-	<p>
-		<a href="https://www.snotch.app/" target="_blank" rel="noopener noreferrer" style="text-decoration:none; margin-right:12px;">
-			<img src="assets/1024.png" alt="Website" width="28" style="vertical-align:middle; margin-right:8px;">Visit Website
-		</a>
-		<a href="https://www.producthunt.com/products/snotch" target="_blank" rel="noopener noreferrer" style="text-decoration:none; margin-left:12px;">
-			<img src="assets/phmain.png" alt="Product Hunt" width="28" style="vertical-align:middle; margin-right:8px;">Product Hunt
-		</a>
-	</p>
-
-	<p align="center">
-		<img src="assets/1024.png" alt="Snotch hero" width="900" />
-	</p>
+	
 </p>
 
 ## About
