@@ -1,33 +1,34 @@
 <p align="center">
+  <img width="150" height="150" src="/assets/1024.png" alt="Snotch Logo">
+  <h1 align="center"><b>Snotch — AI Teleprompter for macOS</b></h1>
   <p align="center">
-    <img width="150" height="150" src="/assets/1024.png" alt="Snotch Logo">
-  </p>
-  <h1 align="center"><b>Snotch - Smart Teleprompter for macOS</b></h1>
-  <p align="center">
-    A local, offline teleprompter that follows your voice.
+    Speak exactly how you meant it.
     <br />
-    Built for creators, presenters, interviews, meetings, and live delivery.
-    <br />
-    <br />
-    <b>Downloads for </b>
+    A free, open-source teleprompter that scrolls with your voice and keeps your eyes on the camera.
+    <br /><br />
+    <b>Download for </b>
     <a href="/Snotch-1.0.dmg">macOS</a>
-    <br />
   </p>
 </p>
+
 <br/>
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-macOS-lightgrey)](https://www.snotch.app/)
+[![Free Forever](https://img.shields.io/badge/free-forever-brightgreen)](https://www.snotch.app/)
+[![Product Hunt](https://img.shields.io/badge/Product%20Hunt-featured-orange)](https://www.producthunt.com/posts/snotch)
 
 <p align="center">
   <img src="/assets/phmain.png" alt="Snotch demo" width="900" />
 </p>
 
-How to Use Snotch: https://www.snotch.app/
+**How to use Snotch:** https://www.snotch.app/
 
-Snotch is a desktop teleprompter that stays pinned near your camera and scrolls as you speak. It is designed to feel natural on calls, recordings, presentations, and live takes, with smooth motion, fast setup, and fully local processing.
+Snotch sits near your camera and scrolls as you speak. It's built around one problem: sounding natural on camera when you have a script. Fixed-speed teleprompters never match how you actually talk. Snotch listens to your voice and follows you — so you can focus on delivering, not keeping up with a timer.
 
-No cloud. No API keys. No uploading your script or voice.
+Tucked into the notch, it keeps your script as close to the lens as possible so eye contact stays real. Everything runs locally. Nothing leaves your machine.
+
+No cloud. No API keys. No subscriptions.
 
 ---
 
@@ -35,43 +36,44 @@ No cloud. No API keys. No uploading your script or voice.
 
 | Feature | Description |
 | :--- | :--- |
-| **Voice follow** | Scrolls with your speech so the script moves when you talk and settles when you pause. |
-| **Invisible in capture workflows** | Built to stay out of screen recordings and video calls while you present. |
-| **Smooth reading motion** | Uses tuned spring-based scrolling so movement feels natural and easy to track. |
-| **Offline speech processing** | Runs locally without sending your script or voice to the cloud. |
-| **Manual mode** | Lets you run the teleprompter at a fixed pace when you want full control. |
-| **Always on top** | Stays near your webcam so your eyeline remains more natural on camera. |
-| **Document import** | Load `.txt`, `.pdf`, or `.docx` files from the menu or drag them directly onto Snotch. |
+| **Voice follow** | Scrolls with your speech — moves when you talk, settles when you pause. |
+| **AI script generation** | Generate and edit scripts directly from the overlay without switching apps. |
+| **Invisible during capture** | Stays out of screen recordings and video calls while you present. |
+| **Smooth motion** | Spring-based scrolling tuned to feel natural and easy to track. |
+| **Offline processing** | Audio stays on your machine — no cloud transcription, no data sent anywhere. |
+| **Manual mode** | Fixed-pace scrolling when you want full control over timing. |
+| **Always on top** | Pins near your webcam so your eyeline stays natural on camera. |
+| **Document import** | Load `.txt`, `.pdf`, or `.docx` files from the menu or drag them straight onto Snotch. |
 
 ---
 
 ## Use cases
 
-- **Presentations**: Keep your delivery smooth without looking down at notes.
-- **Video recording**: Read scripts naturally while keeping your eyes close to the camera.
-- **Meetings and demos**: Stay on message with key talking points always in view.
-- **Interviews and podcasts**: Track questions, intros, and transitions without losing flow.
-- **Live streaming**: Follow prepared segments with a cleaner, more confident delivery.
+- **Video recording** — Read scripts naturally while keeping your eyes close to the lens.
+- **Meetings & demos** — Stay on message with talking points always in view.
+- **Presentations** — Deliver smoothly without looking down at notes.
+- **Interviews & podcasts** — Track questions, intros, and transitions without losing flow.
+- **Live streaming** — Follow prepared segments with a more confident, composed delivery.
 
 ---
 
 ## How it works
 
-1. Double-click Snotch to open the editor, paste your script, or load a `.txt`, `.pdf`, or `.docx` document from the menu.
-2. Minimize back into the pill and position Snotch near your webcam.
-3. Choose between Voice mode and Manual mode from the settings menu.
-4. Use the settings menu any time to adjust font, theme, opacity, microphone, notes, and other presentation settings.
+1. Open Snotch and paste your script — or load a `.txt`, `.pdf`, or `.docx` from the menu.
+2. Minimise into the pill and position it near your webcam.
+3. Pick Voice mode or Manual mode from the settings menu.
+4. Adjust font, theme, opacity, microphone sensitivity, and more any time from settings.
 
 ### Modes
 
-- **Voice mode**: Voice Follow stays active while you speak, helping the script track your delivery.
-- **Manual mode**: Scroll at a controlled pace when you prefer a fixed rhythm instead of speech-driven movement.
+- **Voice mode** — The script tracks your delivery as you speak and pauses when you do.
+- **Manual mode** — Scroll at a fixed pace for a consistent, controlled rhythm.
 
 ---
 
 ## Privacy
 
-Snotch is built for local-first use. Audio processing happens on your machine, and the app is designed around offline teleprompting rather than cloud transcription workflows.
+Everything runs on your machine. Snotch was built for offline use from the start — no cloud transcription, no accounts, no telemetry. Your script and your voice stay yours.
 
 ---
 
