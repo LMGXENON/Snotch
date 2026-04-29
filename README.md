@@ -30,50 +30,49 @@
 
 **How to use Snotch:** [https://www.snotch.app/](https://www.snotch.app/)
 
-Snotch sits near your camera and scrolls as you speak. It's built around one problem: sounding natural on camera when you have a script. Fixed-speed teleprompters never match how you actually talk. Snotch listens to your voice and follows you — so you can focus on delivering, not keeping up with a timer.
+Snotch is built around one simple problem: sounding natural on camera when you have a script. Fixed-speed teleprompters force you to keep pace with a timer. Snotch listens to your voice and scrolls with you — moving when you talk, settling when you pause. Your script stays tucked in the notch, keeping eye contact real and your eyeline close to the lens.
 
-Tucked into the notch, it keeps your script as close to the lens as possible so eye contact stays real. Everything runs locally. Nothing leaves your machine.
-
-**No cloud. No API keys. No subscriptions.**
+Everything runs locally. Nothing leaves your machine. No cloud. No API keys. No subscriptions.
 
 ---
 
-## Features
+## Key Features
 
 | Feature | Description |
 | :--- | :--- |
-| **Voice follow** | Scrolls with your speech — moves when you talk, settles when you pause. |
-| **AI script generation** | Generate and edit scripts directly from the overlay without switching apps. |
-| **Invisible during capture** | Stays out of screen recordings and video calls while you present. |
-| **Smooth motion** | Spring-based scrolling tuned to feel natural and easy to track. |
-| **Offline processing** | Audio stays on your machine — no cloud transcription, no data sent anywhere. |
-| **Manual mode** | Fixed-pace scrolling when you want full control over timing. |
-| **Always on top** | Pins near your webcam so your eyeline stays natural on camera. |
-| **Document import** | Load `.txt`, `.pdf`, or `.docx` files from the menu or drag them straight onto Snotch. |
+| 🎤 **Voice Follow** | Scrolls with your speech in real-time — moves when you talk, pauses when you do. |
+| ✨ **AI Script Generation** | Generate and edit scripts directly from the overlay without switching apps. |
+| 👁️ **Invisible During Capture** | Stays out of screen recordings and video calls while you present. |
+| 🎯 **Smooth Motion** | Spring-based scrolling tuned to feel natural and easy to track. |
+| 🔒 **Offline Processing** | All audio processing stays on your machine — zero cloud transcription, zero data sent. |
+| 📄 **Document Import** | Load `.txt`, `.pdf`, or `.docx` files from the menu or drag them straight onto Snotch. |
+| 🎮 **Two Modes** | Voice mode tracks you automatically, or Manual mode for fixed-pace control. |
+| 📌 **Always Visible** | Pins near your webcam so your eyes stay naturally trained on the lens. |
 
 ---
 
-## Use cases
+## When to Use Snotch
 
-* **Video recording** — Read scripts naturally while keeping your eyes close to the lens.
-* **Meetings & demos** — Stay on message with talking points always in view.
-* **Presentations** — Deliver smoothly without looking down at notes.
-* **Interviews & podcasts** — Track questions, intros, and transitions without losing flow.
-* **Live streaming** — Follow prepared segments with a more confident, composed delivery.
+* **Video recording** — Deliver scripts naturally while keeping your eyes at the lens.
+* **Meetings & demos** — Stay on message with talking points always in frame.
+* **Presentations** — Speak smoothly without glancing at notes.
+* **Interviews & podcasts** — Track questions and transitions without losing rhythm.
+* **Live streaming** — Maintain composure while following prepared segments.
 
 ---
 
-## How it works
+## How It Works
 
-1.  Open Snotch and paste your script — or load a `.txt`, `.pdf`, or `.docx` from the menu.
-2.  Minimise into the pill and position it near your webcam.
-3.  Pick **Voice mode** or **Manual mode** from the settings menu.
-4.  Adjust font, theme, opacity, microphone sensitivity, and more any time from settings.
+1. **Open & Load** — Paste your script directly, or load a `.txt`, `.pdf`, or `.docx` file.
+2. **Position** — Minimize into the pill and position it near your webcam.
+3. **Pick Your Mode** — Choose **Voice mode** (automatic) or **Manual mode** (fixed pace) from settings.
+4. **Fine-tune** — Adjust font, theme, opacity, sensitivity, and more anytime.
 
-### Modes
+---
 
-* **Voice mode** — The script tracks your delivery as you speak and pauses when you do.
-* **Manual mode** — Scroll at a fixed pace for a consistent, controlled rhythm.
+## Privacy
+
+Everything runs on your machine. Snotch was built for offline use from the start — no cloud transcription, no accounts, no telemetry. Your script and your voice stay yours.
 
 ---
 
