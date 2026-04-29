@@ -1,113 +1,29 @@
-# Snotch
-
 <p align="center">
-	<img src="assets/1024.png" alt="Snotch logo" width="160" />
-</p>
-
-Snotch is an open-source teleprompter for macOS that follows your voice and presents a clean, notch-style overlay for on-camera scripts. It’s designed for creators who want precise, natural-paced delivery while recording or presenting.
-<p align="center">
-	<img src="assets/logo.svg" alt="Snotch Logo" width="150" />
-	<h1 style="margin-top:12px;">Snotch — Smart Teleprompter for macOS</h1>
-	<p style="max-width:760px; margin:8px auto; color:#666;">
-		A local, offline teleprompter that follows your voice. Built for creators, presenters, interviews, meetings, and live delivery.
-		<br />
-		<strong>Downloads for</strong>
-		<a href="/Snotch-1.0.dmg">macOS</a>
-	</p>
-
-	<p>
-		<a href="https://www.snotch.app/" target="_blank" rel="noopener noreferrer"><img src="assets/1024.png" alt="Website" width="36" style="vertical-align:middle; margin-right:8px;"> Visit Website</a>
-		&nbsp;&nbsp;•&nbsp;&nbsp;
-		<a href="https://www.producthunt.com/products/snotch" target="_blank" rel="noopener noreferrer"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1135212&amp;theme=dark" alt="Product Hunt" width="120" style="vertical-align:middle; margin-right:8px;"></a>
-	</p>
-
-	<p align="center">
-		<img src="assets/1024.png" alt="Snotch demo" width="900" />
-	</p>
-</p>
-
-<p align="center">
-	<img src="assets/1024.png" alt="Snotch logo" width="160" />
-
-	<h2 style="margin-top:12px; margin-bottom:6px;">Snotch — Voice-synced teleprompter for macOS</h2>
-
-	<!-- Website & Product Hunt buttons -->
-	<p>
-		<a href="https://www.snotch.app/" target="_blank" rel="noopener noreferrer" style="text-decoration:none; margin-right:12px;">
-			<img src="assets/1024.png" alt="Website" width="28" style="vertical-align:middle; margin-right:8px;">Visit Website
-		</a>
-		<a href="https://www.producthunt.com/products/snotch" target="_blank" rel="noopener noreferrer" style="text-decoration:none; margin-left:12px;">
-			<img src="assets/phmain.png" alt="Product Hunt" width="28" style="vertical-align:middle; margin-right:8px;">Product Hunt
-		</a>
-	</p>
-
-	<p align="center">
-		<img src="assets/1024.png" alt="Snotch hero" width="900" />
-	</p>
-</p>
-
-## About
-
-Snotch is a lightweight, local-first teleprompter for macOS that follows your voice to advance text in natural timing. It’s intended for creators, presenters, and educators who want confident delivery without cloud dependencies.
-
-## Highlights
-
-- Voice-synced scrolling that follows speaking cadence
-- Two reading modes: Highlighted (line emphasis) and Continuous (smooth scroll)
-- Built-in audio tuning (noise gate, input gain) and live VU meter
-- Script import/export (TXT, Markdown, PDF) and simple in-app editor
-- Native macOS (SwiftUI) with small footprint
-
-## Quick links & badges
-
-- App (build): `Snotch/Snotch.app` (open `Snotch.xcodeproj` in Xcode)
-- Download (built DMG): `Snotch-1.0.dmg` (release artifact)
-
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Platform](https://img.shields.io/badge/platform-macOS-lightgrey)](https://www.snotch.app/)
-
-<p align="center">
-	<img src="assets/1024.png" alt="Snotch demo" width="900" />
-</p>
-
-## How to Use (Quick)
-
-1. Open `Snotch` from your Applications folder or run the built app.
-2. Paste your script into the editor or import a `.txt` / `.md` / `.pdf` file.
-3. Minimize the editor to the notch overlay and position it near your webcam.
-4. Toggle Voice mode and start speaking — the script will track your voice and advance naturally.
-
-## Features
-
-# Snotch - Smart Teleprompter for macOS
-
-<p align="center">
-	<p align="center">
-		<img width="150" height="150" src="/assets/1024.png" alt="Snotch Logo">
-	</p>
-	<h1 align="center"><b>Snotch - Smart Teleprompter for macOS</b></h1>
-	<p align="center">
-		A local, offline teleprompter that follows your voice.
-		<br />
-		Built for creators, presenters, interviews, meetings, and live delivery.
-		<br />
-		<br />
-		<b>Downloads for </b>
-		<a href="/Snotch-1.0.dmg">macOS</a>
-		<br />
-	</p>
+  <p align="center">
+    <img width="150" height="150" src="/assets/1024.png" alt="Snotch Logo">
+  </p>
+  <h1 align="center"><b>Snotch - Smart Teleprompter for macOS</b></h1>
+  <p align="center">
+    A local, offline teleprompter that follows your voice.
+    <br />
+    Built for creators, presenters, interviews, meetings, and live delivery.
+    <br />
+    <br />
+    <b>Downloads for </b>
+    <a href="/Snotch-1.0.dmg">macOS</a>
+    <br />
+  </p>
 </p>
 <br/>
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-macOS-lightgrey)](https://www.snotch.app/)
 
-
 <p align="center">
-	<img src="/assets/phmain.png" alt="Snotch demo" width="900" />
+  <img src="/assets/phmain.png" alt="Snotch demo" width="900" />
 </p>
 
 How to Use Snotch: https://www.snotch.app/
-
 
 Snotch is a desktop teleprompter that stays pinned near your camera and scrolls as you speak. It is designed to feel natural on calls, recordings, presentations, and live takes, with smooth motion, fast setup, and fully local processing.
 
@@ -168,4 +84,3 @@ Distributed under the MIT License. See [LICENSE](LICENSE) for more information.
 ## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=LMGXENON/Snotch&type=Date)](https://www.star-history.com/#LMGXENON/Snotch&Date)
-
