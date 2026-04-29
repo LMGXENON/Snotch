@@ -26,59 +26,78 @@ Snotch is an open-source teleprompter for macOS that follows your voice and pres
 	</p>
 </p>
 
-Highlights
- - Voice-synced scrolling that follows speaking cadence
- - Two reading modes: Highlighted (line emphasis) and Continuous (smooth scroll)
- - Built-in audio tuning (noise gate, input gain) and live VU meter
- - Script import/export (TXT, Markdown, PDF) and simple in-app editor
- - Small, fast native macOS app (SwiftUI)
+<p align="center">
+	<img src="assets/1024.png" alt="Snotch logo" width="160" />
 
-Quick links
- - App: `Snotch/Snotch.app` (build with Xcode)
-Badges
+	<h2 style="margin-top:12px; margin-bottom:6px;">Snotch — Voice-synced teleprompter for macOS</h2>
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-macOS-lightgrey)](https://www.snotch.app/)
+	<!-- Website & Product Hunt buttons -->
+	<p>
+		<a href="https://www.snotch.app/" target="_blank" rel="noopener noreferrer" style="text-decoration:none; margin-right:12px;">
+			<img src="assets/1024.png" alt="Website" width="28" style="vertical-align:middle; margin-right:8px;">Visit Website
+		</a>
+		<a href="https://www.producthunt.com/products/snotch" target="_blank" rel="noopener noreferrer" style="text-decoration:none; margin-left:12px;">
+			<img src="assets/phmain.png" alt="Product Hunt" width="28" style="vertical-align:middle; margin-right:8px;">Product Hunt
+		</a>
+	</p>
+
+	<p align="center">
+		<img src="assets/1024.png" alt="Snotch hero" width="900" />
+	</p>
+</p>
+
+## About
+
+Snotch is a lightweight, local-first teleprompter for macOS that follows your voice to advance text in natural timing. It’s intended for creators, presenters, and educators who want confident delivery without cloud dependencies.
+
+## Highlights
+
+- Voice-synced scrolling that follows speaking cadence
+- Two reading modes: Highlighted (line emphasis) and Continuous (smooth scroll)
+- Built-in audio tuning (noise gate, input gain) and live VU meter
+- Script import/export (TXT, Markdown, PDF) and simple in-app editor
+- Native macOS (SwiftUI) with small footprint
+
+## Quick links & badges
+
+- App (build): `Snotch/Snotch.app` (open `Snotch.xcodeproj` in Xcode)
+- Download (built DMG): `Snotch-1.0.dmg` (release artifact)
+
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Platform](https://img.shields.io/badge/platform-macOS-lightgrey)](https://www.snotch.app/)
 
 <p align="center">
 	<img src="assets/1024.png" alt="Snotch demo" width="900" />
 </p>
 
-Installation (Developer)
-1. Clone the repository:
+## How to Use (Quick)
 
-```bash
-git clone https://github.com/LMGXENON/Snotch.git
-cd Snotch
-```
+1. Open `Snotch` from your Applications folder or run the built app.
+2. Paste your script into the editor or import a `.txt` / `.md` / `.pdf` file.
+3. Minimize the editor to the notch overlay and position it near your webcam.
+4. Toggle Voice mode and start speaking — the script will track your voice and advance naturally.
 
-2. Open the Xcode project and build the Release target:
+## Features
 
-```bash
-open Snotch.xcodeproj
-# In Xcode: select the 'Snotch' scheme, choose a macOS target, then Product → Build
-```
+| Feature | Description |
+| :--- | :--- |
+| **Voice follow** | Scrolls with your speech so the script moves when you talk and settles when you pause. |
+| **Invisible in capture** | Designed to remain out of screen recordings and video calls while you present. |
+| **Smooth reading motion** | Tuned spring-based scrolling for natural motion. |
+| **Offline processing** | Runs locally — no cloud uploads or API keys required. |
+| **Manual mode** | Fixed-pace scrolling when you want precise control. |
+| **Document import** | Import `.txt`, `.md`, `.pdf`, or `.docx`. |
 
-3. To produce a distributable DMG (script provided):
+## Contributing
 
-```bash
-./scripts/create-dmg.sh
-```
+Contributions are welcome. Please open an issue to start a discussion, then submit a branch from `main` with a clear PR and description. Include small, focused commits and tests where applicable.
 
-Notes
- - This repository no longer contains a running backend server or license key server. Any previously included server code or CSV exports were removed to simplify the open-source distribution.
+## License
 
-Contributing
-We welcome contributions. To contribute:
+This project is released under the MIT License — see `LICENSE` for details.
 
-1. Open an issue describing the change or bug.
-2. Create a branch from `main` named `feature/your-change`.
-3. Submit a clean PR with tests where applicable and a short description.
+## Contact
 
-Code of conduct
-Be kind and respectful. This project follows a standard open-source Code of Conduct.
-
-License
+For bugs and feature requests, open an issue: https://github.com/LMGXENON/Snotch/issues
 This project is released under the MIT License — see `LICENSE` for details.
 
 Maintainers
