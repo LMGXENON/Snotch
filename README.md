@@ -7,7 +7,7 @@
     A free, open-source teleprompter that scrolls with your voice and keeps your eyes on the camera.
     <br /><br />
     <a href="/downloads/Snotch-1.0.dmg">
-      <img src="https://img.shields.io/badge/Download-macOS-0B00EE?style=for-the-badge&logo=apple&logoColor=white&labelColor=1a1a2e" height="54" alt="Download for macOS" />
+      <img src="https://img.shields.io/badge/Download-macOS-000?style=for-the-badge&logo=apple&logoColor=white&labelColor=333" height="54" alt="Download for macOS" />
     </a>
     &nbsp;
     <a href="https://www.producthunt.com/products/snotch?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-snotch" target="_blank" rel="noopener noreferrer">
