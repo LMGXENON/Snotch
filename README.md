@@ -1,222 +1,95 @@
 # Snotch
 
-Say it exactly how you meant it.
+Snotch is an open-source teleprompter for macOS that follows your voice and presents a clean, notch-style overlay for on-camera scripts. It’s designed for creators who want precise, natural-paced delivery while recording or presenting.
 
-Snotch is a voice-synced teleprompter for macOS with a notch-style overlay, script editor, AI-assisted script generation, and backend services for generation and admin tooling.
+Website: https://www.snotch.app/
+Product Hunt: https://www.producthunt.com/products/snotch
 
-## Hero Section
+Highlights
+ - Voice-synced scrolling that follows speaking cadence
+ - Two reading modes: Highlighted (line emphasis) and Continuous (smooth scroll)
+ - Built-in audio tuning (noise gate, input gain) and live VU meter
+ - Script import/export (TXT, Markdown, PDF) and simple in-app editor
+ - Small, fast native macOS app (SwiftUI)
 
-The product hero experience is built around a live notch-style prompter preview.
+Quick links
+ - App: `Snotch/Snotch.app` (build with Xcode)
+ - Landing page: `landing page/` (static demo)
 
-- **Tagline:** "Snotch - Say it exactly how you meant it."
-- **Visual concept:** Floating notch UI with animated scrolling script lines.
-- **Where it lives:**
-  - `landing page/index.html` (header and notch shell)
-  - `landing page/assets/main.js` (`loadPrompterText`, `initNotchPrompter`)
-  - `landing page/assets/prompter.txt` (editable hero script lines)
-
-If you want to change the hero prompter text, update `landing page/assets/prompter.txt`.
-
-## Features
-
-### macOS app (SwiftUI)
-
-- Voice-aware script scrolling that follows speaking cadence.
-- Two notch reading modes:
-  - **Highlighted:** current line emphasis
-  - **Continuous:** smooth scrolling, no per-line highlight
-- Built-in **Audio Tuning**:
-  - Noise Gate
-  - Input Gain
-  - Live VU meter
-- Script management:
-  - Create, rename, delete
-  - Search scripts
-  - Drag-and-drop reorder in sidebar
-- Script import/export:
-  - Import: `.txt`, `.md`, `.docx`, `.pdf`
-  - Export: TXT, Markdown, PDF
-- Drag-and-drop import directly into:
-  - Main app window
-  - Notch overlay
-- AI script generator with options for:
-  - Topic, audience, tone, goal
-  - Optional length target
-  - Optional teleprompter cue insertion
-  - Optional style matching from recorded speech sample
-- In-script teleprompter directives:
-  - `<break>`
-  - `<slow>`
-  - `<fast>`
-  - `<focus>`
-  - `<hold Ns>`
-- Overlay quick editor (double-click notch to edit active script quickly).
-- Keyboard controls:
-  - `Cmd+P` Play/Stop
-  - `Shift+Up/Down` manual line scroll
-  - `Cmd+[` toggle sidebar
-  - `Esc` close app
-
-### Backend (Node.js + Express)
-
-- Health endpoint.
-- Script generation endpoints.
-- Bundle idea generation endpoint.
-- Admin auth endpoint.
-- Admin license management endpoints (list/create/revoke/reactivate/update).
-- Security middleware (`helmet`, CORS controls, rate limits).
-- Flat-file storage for license records (`backend/data/licenses.json`).
-
-### Landing page
-
-- Notch-themed hero header and animated prompter simulation.
-- Dynamic line loading from `assets/prompter.txt`.
-- Mobile/desktop interaction handling for demo media.
-
-## Installation
-
-## Prerequisites
-
-- macOS
-- Xcode 15+
-- Node.js 18+ and npm
-- Python 3.10+ (for license key utility scripts)
-
-## 1) Clone repository
+Installation (Developer)
+1. Clone the repository:
 
 ```bash
 git clone https://github.com/LMGXENON/Snotch.git
 cd Snotch
 ```
 
-## 2) Backend setup
-
-```bash
-cd backend
-npm install
-cp .env.example .env
-```
-
-Set values in `.env`:
-
-- `OPENAI_API_KEY`
-- `ADMIN_API_KEY`
-- `JWT_SECRET`
-- `LICENSE_PEPPER`
-- optional: `OPENAI_MODEL`, `CORS_ORIGIN`, `REQUEST_TIMEOUT_MS`, `TRUST_PROXY`
-
-Run backend locally:
-
-```bash
-npm run dev
-```
-
-Backend default URL: `http://localhost:8787`
-
-## 3) macOS app setup
-
-From repository root:
+2. Open the Xcode project and build the Release target:
 
 ```bash
 open Snotch.xcodeproj
+# In Xcode: select the 'Snotch' scheme, choose a macOS target, then Product → Build
 ```
 
-Then in Xcode:
+3. To produce a distributable DMG (script provided):
 
-1. Select scheme **Snotch**.
-2. Choose a local macOS run target.
-3. Build and Run.
+```bash
+./scripts/create-dmg.sh
+```
 
-## 4) Optional: run landing page locally
+Notes
+ - This repository no longer contains a running backend server or license key server. Any previously included server code or CSV exports were removed to simplify the open-source distribution.
+ - If you need to run the landing page locally for preview, serve the `landing page/` directory with a static server:
 
 ```bash
 cd "landing page"
 python3 -m http.server 5500
+# then open: http://localhost:5500
 ```
 
-Open: `http://localhost:5500`
+Contributing
+We welcome contributions. To contribute:
 
-## Usage
+1. Open an issue describing the change or bug.
+2. Create a branch from `main` named `feature/your-change`.
+3. Submit a clean PR with tests where applicable and a short description.
 
-## Quick start
+Code of conduct
+Be kind and respectful. This project follows a standard open-source Code of Conduct.
 
-1. Launch Snotch.
-2. Complete onboarding permissions (microphone, speech recognition, optional accessibility).
-3. Create or import a script.
-4. Press **Play** (or `Cmd+P`) to start listening and auto-scroll.
-5. Adjust **Audio Settings** (Noise Gate / Input Gain) if detection is too sensitive or not sensitive enough.
+License
+This project is released under the MIT License — see `LICENSE` for details.
 
-## Audio tuning tips
+Maintainers
+- LMGXENON
 
-- **Higher Noise Gate**: filters room/keyboard noise; requires louder speech.
-- **Lower Noise Gate**: more sensitive; captures softer voice.
-- **Higher Input Gain**: boosts weak microphone signals.
-- Use the **VU meter** to see live input level while tuning.
+Contact
+- Feedback and bugs: https://github.com/LMGXENON/Snotch/issues
 
-## Script directives
+---
+_This README was updated to reflect that backend and license-server code has been removed for this open-source release._
 
-You can place tags directly in script text to control pacing/behavior:
+Product Hunt & Website Copy
+---------------------------
 
-- `<break>` pause at cue boundary
-- `<slow>` slower section
-- `<fast>` faster section
-- `<focus>` visual emphasis section
-- `<hold 1.2s>` timed hold before continuing
+Suggested short tagline (for Product Hunt):
 
-## Useful commands
+"Snotch — a voice-synced teleprompter for macOS that follows your speech, not your cursor."
 
-### Backend
+Two-sentence summary (for website hero or Product Hunt description):
 
-```bash
-npm run dev
-npm run start
-npm run lint
-npm test
-npm run secrets
-npm run import:licenses -- ../licenses.csv
-```
+"Snotch is a lightweight macOS teleprompter that listens to your voice and advances text in natural, human timing. It provides high-contrast notch-style overlays, precise audio tuning, and a distraction-free editing workflow for creators and presenters."
 
-### License key generation (root)
+Longer blurb (for website meta or Product Hunt long description):
 
-```bash
-python3 scripts/generate_license_keys.py --count 50 --prefix SNTCH --out licenses.csv
-```
+"Snotch brings teleprompter-grade timing to your recordings by syncing the script to your speech in real time. Designed for creators, presenters, and educators, Snotch combines a compact notch overlay with advanced audio tuning (noise gate, input gain, live VU) and two reading modes. Import or edit scripts in-app, export to standard formats, and focus on delivery — not scrolling."
 
-## API summary
+Suggested tags: `macOS`, `open-source`, `teleprompter`, `content-creation`, `accessibility`
 
-Primary backend routes:
+How to publish this project on Product Hunt
+1. Use the short tagline as the headline.
+2. Paste the two-sentence summary into the tagline/intro box.
+3. Use the longer blurb as the project description/details.
+4. Attach 1–2 screenshots showing the notch overlay and the in-app editor.
+5. Add suggested tags above and link to the GitHub repo and the landing page.
 
-- `GET /health`
-- `POST /v1/generate/script`
-- `POST /v1/generate/bundles`
-- `POST /v1/admin/auth`
-- `GET /v1/admin/licenses`
-- `POST /v1/admin/licenses/create`
-- `POST /v1/admin/licenses/revoke`
-- `POST /v1/admin/licenses/reactivate`
-- `POST /v1/admin/licenses/update`
-
-See also:
-
-- `backend/README.md`
-- `BACKEND_LICENSE_SPEC.md`
-
-## Project structure
-
-```text
-Snotch/
-  Snotch/                 # macOS SwiftUI app
-  Snotch.xcodeproj/       # Xcode project
-  backend/                # Node/Express backend
-  landing page/           # marketing/hero page assets
-  scripts/                # utility scripts (license generation)
-  BACKEND_LICENSE_SPEC.md
-```
-
-## License
-
-There is currently **no root OSS LICENSE file** in this repository.
-
-Until a license file is added, treat this project as **all rights reserved** by default.
-
-For backend license key workflow details, see `BACKEND_LICENSE_SPEC.md`.
