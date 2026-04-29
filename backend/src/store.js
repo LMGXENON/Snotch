@@ -27,7 +27,9 @@ function readDB() {
 
 function writeDB(db) {
   ensureDataFile();
-  fs.writeFileSync(dataFile, JSON.stringify(db, null, 2), "utf8");
+  const tempFile = `${dataFile}.tmp`;
+  fs.writeFileSync(tempFile, JSON.stringify(db, null, 2), "utf8");
+  fs.renameSync(tempFile, dataFile);
 }
 
 export function findLicenseByHash(hash) {

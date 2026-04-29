@@ -7,9 +7,8 @@ struct SnotchApp: App {
     @AppStorage("snotch.onboardingDone") private var onboardingDone: Bool = false
     @StateObject private var speechManager: SpeechManager
     @StateObject private var overlayController: OverlayWindowController
-    @StateObject private var licenseManager = LicenseManager()
     @State private var globalMonitor: Any? = nil
-    @State private var showManageLicense: Bool = false
+    @State private var localMonitor: Any? = nil
 
     init() {
         let sm = SpeechManager()
@@ -20,11 +19,8 @@ struct SnotchApp: App {
     var body: some Scene {
         WindowGroup("Snotch Editor") {
             Group {
-                if !licenseManager.isLicensed {
-                    LicenseActivationView(licenseManager: licenseManager)
-                } else if onboardingDone {
+                if onboardingDone {
                     ContentView(
-                        licenseManager:    licenseManager,
                         speechManager:     speechManager,
                         overlayController: overlayController
                     )
@@ -35,8 +31,7 @@ struct SnotchApp: App {
                 }
             }
             .onAppear {
-                Task { await licenseManager.startupValidate() }
-                if licenseManager.isLicensed && onboardingDone {
+                if onboardingDone {
                     installGlobalHotkeys()
                     overlayController.show()
                 }
@@ -46,25 +41,13 @@ struct SnotchApp: App {
                     queue: .main
                 ) { _ in overlayController.repositionIfNeeded() }
             }
-            .onChange(of: licenseManager.isLicensed) { licensed in
-                if licensed && onboardingDone {
-                    installGlobalHotkeys()
-                    overlayController.show()
-                } else {
-                    removeGlobalHotkeys()
-                    overlayController.hide()
-                }
-            }
-            .onChange(of: onboardingDone) { done in
-                if done && licenseManager.isLicensed {
+            .onChange(of: onboardingDone) { _, done in
+                if done {
                     installGlobalHotkeys()
                     overlayController.show()
                 }
             }
             .onDisappear { removeGlobalHotkeys() }
-            .sheet(isPresented: $showManageLicense) {
-                ManageLicenseView(licenseManager: licenseManager)
-            }
         }
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified)
@@ -75,6 +58,11 @@ struct SnotchApp: App {
                     .keyboardShortcut("p", modifiers: .command)
             }
             CommandGroup(after: .textEditing) {
+                Button("Select All") {
+                    NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil)
+                }
+                .keyboardShortcut("a", modifiers: .command)
+
                 Button("Scroll Up") {
                     NotificationCenter.default.post(name: .snotchScrollUp, object: nil)
                 }
@@ -96,24 +84,30 @@ struct SnotchApp: App {
             CommandMenu("Format") {
                 EmptyView()
             }
-            CommandMenu("License") {
-                Button("Manage License") {
-                    showManageLicense = true
-                }
-                .keyboardShortcut("l", modifiers: [.command, .shift])
-
-                Button("Revalidate License") {
-                    Task { _ = await licenseManager.validateCurrentLicense(force: true) }
-                }
-
-                Button("Deactivate License") {
-                    licenseManager.deactivate()
-                }
-            }
         }
     }
 
     private func installGlobalHotkeys() {
+        if localMonitor == nil {
+            localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+                let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+                if flags.isEmpty && event.keyCode == 53 {
+                    DispatchQueue.main.async {
+                        NSApp.terminate(nil)
+                    }
+                    return nil
+                }
+                if flags == .command,
+                   event.charactersIgnoringModifiers?.lowercased() == "a" {
+                    DispatchQueue.main.async {
+                        NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil)
+                    }
+                    return nil
+                }
+                return event
+            }
+        }
+
         guard globalMonitor == nil else { return }
         guard AXIsProcessTrusted() else { return }
         globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { event in
@@ -139,6 +133,10 @@ struct SnotchApp: App {
         if let monitor = globalMonitor {
             NSEvent.removeMonitor(monitor)
             globalMonitor = nil
+        }
+        if let monitor = localMonitor {
+            NSEvent.removeMonitor(monitor)
+            localMonitor = nil
         }
     }
 }

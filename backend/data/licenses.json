@@ -61,7 +61,7 @@
       "licenseKey": "SNTCH-G3ZD-FNCA-Z45Q",
       "licenseHash": "fcd28adab29d3fa7f1399b7693dbfd66ba391afd59272ab5e36d419511bc4a24",
       "status": "active",
-      "devicesAllowed": 1,
+      "devicesAllowed": 2,
       "activations": [
         {
           "deviceId": "447D8929-B0E7-4725-8479-C3AD0D265231",
@@ -70,10 +70,18 @@
           "lastSeenAt": "2026-03-16T10:34:42.299Z",
           "appVersion": "1.0",
           "platform": "macOS"
+        },
+        {
+          "deviceId": "D881214C-9DC0-4BEA-A3E3-9AB82E221E75",
+          "deviceName": "Waleed’s MacBook Air",
+          "firstSeenAt": "2026-03-16T12:39:39.170Z",
+          "lastSeenAt": "2026-03-16T12:39:39.170Z",
+          "appVersion": "1.0",
+          "platform": "macOS"
         }
       ],
       "createdAt": "2026-03-16T10:22:20.734Z",
-      "updatedAt": "2026-03-16T10:27:37.899Z",
+      "updatedAt": "2026-03-16T12:39:35.550Z",
       "note": ""
     },
     {

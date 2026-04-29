@@ -5,17 +5,116 @@ import UniformTypeIdentifiers
 import PDFKit
 import Speech
 import AVFoundation
+import ApplicationServices
+
+struct StickyNoteData: Identifiable, Codable, Equatable {
+    var id: UUID = UUID()
+    var text: String = ""
+    var pinned: Bool = false
+}
 
 struct SnotchScript: Identifiable, Codable, Equatable {
     var id:         UUID   = UUID()
     var title:      String
     var body:       String
+    var notes:      String? = nil
+    var noteColor:  String? = nil
+    var notePinned: Bool? = nil
+    var stickyNotes: [StickyNoteData] = []
     var lastEdited: Date   = Date()
     var lastOpened: Date? = nil
     var targetWPMMin: Double = 160
     var targetWPMMax: Double = 210
     var workspace: String = "General"
     var tags: [String] = []
+
+    init(
+        id: UUID = UUID(),
+        title: String,
+        body: String,
+        notes: String? = nil,
+        noteColor: String? = nil,
+        notePinned: Bool? = nil,
+        stickyNotes: [StickyNoteData] = [],
+        lastEdited: Date = Date(),
+        lastOpened: Date? = nil,
+        targetWPMMin: Double = 160,
+        targetWPMMax: Double = 210,
+        workspace: String = "General",
+        tags: [String] = []
+    ) {
+        self.id = id
+        self.title = title
+        self.body = body
+        self.notes = notes
+        self.noteColor = noteColor
+        self.notePinned = notePinned
+        self.stickyNotes = stickyNotes
+        self.lastEdited = lastEdited
+        self.lastOpened = lastOpened
+        self.targetWPMMin = targetWPMMin
+        self.targetWPMMax = targetWPMMax
+        self.workspace = workspace
+        self.tags = tags
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case body
+        case notes
+        case noteColor
+        case notePinned
+        case stickyNotes
+        case lastEdited
+        case lastOpened
+        case targetWPMMin
+        case targetWPMMax
+        case workspace
+        case tags
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        title = try container.decodeIfPresent(String.self, forKey: .title) ?? "Untitled Script"
+        body = try container.decodeIfPresent(String.self, forKey: .body) ?? ""
+        notes = try container.decodeIfPresent(String.self, forKey: .notes)
+        noteColor = try container.decodeIfPresent(String.self, forKey: .noteColor)
+        notePinned = try container.decodeIfPresent(Bool.self, forKey: .notePinned)
+        stickyNotes = try container.decodeIfPresent([StickyNoteData].self, forKey: .stickyNotes) ?? []
+        lastEdited = try container.decodeIfPresent(Date.self, forKey: .lastEdited) ?? Date()
+        lastOpened = try container.decodeIfPresent(Date.self, forKey: .lastOpened)
+        targetWPMMin = try container.decodeIfPresent(Double.self, forKey: .targetWPMMin) ?? 160
+        targetWPMMax = try container.decodeIfPresent(Double.self, forKey: .targetWPMMax) ?? 210
+        workspace = try container.decodeIfPresent(String.self, forKey: .workspace) ?? "General"
+        tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
+
+        // Migrate legacy single-note fields to the new multi-note model.
+        if stickyNotes.isEmpty,
+           let legacy = notes?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !legacy.isEmpty {
+            stickyNotes = [StickyNoteData(text: legacy, pinned: notePinned ?? false)]
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(title, forKey: .title)
+        try container.encode(body, forKey: .body)
+        try container.encodeIfPresent(notes, forKey: .notes)
+        try container.encodeIfPresent(noteColor, forKey: .noteColor)
+        try container.encodeIfPresent(notePinned, forKey: .notePinned)
+        try container.encode(stickyNotes, forKey: .stickyNotes)
+        try container.encode(lastEdited, forKey: .lastEdited)
+        try container.encodeIfPresent(lastOpened, forKey: .lastOpened)
+        try container.encode(targetWPMMin, forKey: .targetWPMMin)
+        try container.encode(targetWPMMax, forKey: .targetWPMMax)
+        try container.encode(workspace, forKey: .workspace)
+        try container.encode(tags, forKey: .tags)
+    }
 }
 
 final class ScriptStore: ObservableObject {
@@ -44,10 +143,23 @@ final class ScriptStore: ObservableObject {
     }
 
     func addScript() -> SnotchScript {
-        let s = SnotchScript(title: "Untitled Script", body: "")
+        let s = SnotchScript(title: nextUntitledTitle(), body: "")
         scripts.insert(s, at: 0)
         save()
         return s
+    }
+
+    private func nextUntitledTitle() -> String {
+        let used = Set(scripts.map { $0.title.lowercased() })
+        var suffix = 0
+
+        while true {
+            let candidate = suffix == 0 ? "Untitled" : "Untitled \(suffix)"
+            if !used.contains(candidate.lowercased()) {
+                return candidate
+            }
+            suffix += 1
+        }
     }
 
     func update(_ script: SnotchScript) {
@@ -143,22 +255,321 @@ private struct VisualEffectBackground: NSViewRepresentable {
     func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }
 
-private struct EditorScrollBarHider: NSViewRepresentable {
+private extension View {
+    @ViewBuilder
+    func snotchTextSelection(enabled: Bool) -> some View {
+        if enabled {
+            self.textSelection(.enabled)
+        } else {
+            self.textSelection(.disabled)
+        }
+    }
+}
+
+private struct EditorScrollBarStyler: NSViewRepresentable {
+    private let activeLineLayerName = "snotch.active-line-highlight"
+    let topInset: CGFloat
+    let bottomInset: CGFloat
+    let rightInset: CGFloat
+    let useDarkKnob: Bool
+    let showsVerticalScroller: Bool
+    let textTopInset: CGFloat
+    let textLeadingInset: CGFloat
+    let isEditable: Bool
+    let highlightedLineIndex: Int?
+    let highlightOpacity: CGFloat
+    let onLineTapped: ((Int) -> Void)?
+
+    final class Coordinator: NSObject {
+        private var clickRecognizer: NSClickGestureRecognizer?
+        private weak var observedTextView: NSTextView?
+        private var onLineTapped: ((Int) -> Void)?
+        private var lastTappedLine: Int?
+
+        deinit {
+            detachClickRecognizer()
+        }
+
+        func updateInteraction(for textView: NSTextView, onLineTapped: ((Int) -> Void)?) {
+            self.onLineTapped = onLineTapped
+
+            if observedTextView !== textView {
+                detachClickRecognizer()
+                observedTextView = textView
+            }
+
+            guard let onLineTapped else {
+                detachClickRecognizer()
+                return
+            }
+
+            self.onLineTapped = onLineTapped
+
+            if clickRecognizer == nil {
+                let recognizer = NSClickGestureRecognizer(target: self, action: #selector(handleTextClick(_:)))
+                recognizer.numberOfClicksRequired = 1
+                textView.addGestureRecognizer(recognizer)
+                clickRecognizer = recognizer
+            }
+        }
+
+        private func detachClickRecognizer() {
+            if let clickRecognizer, let observedTextView {
+                observedTextView.removeGestureRecognizer(clickRecognizer)
+            }
+
+            clickRecognizer = nil
+            lastTappedLine = nil
+        }
+
+        @objc private func handleTextClick(_ recognizer: NSClickGestureRecognizer) {
+            guard recognizer.state == .ended,
+                  let textView = observedTextView,
+                  let onLineTapped else {
+                return
+            }
+
+            let point = recognizer.location(in: textView)
+            let line = Self.lineIndex(forPoint: point, in: textView)
+
+            guard line != lastTappedLine else { return }
+            lastTappedLine = line
+            onLineTapped(line)
+        }
+
+        private static func lineIndex(forPoint point: NSPoint, in textView: NSTextView) -> Int {
+            let text = textView.string as NSString
+            guard text.length > 0 else { return 0 }
+
+            guard let layoutManager = textView.layoutManager,
+                  let textContainer = textView.textContainer else {
+                return 0
+            }
+
+            let containerOrigin = textView.textContainerOrigin
+            let containerPoint = NSPoint(
+                x: point.x - containerOrigin.x,
+                y: point.y - containerOrigin.y
+            )
+
+            let location = layoutManager.characterIndex(
+                for: containerPoint,
+                in: textContainer,
+                fractionOfDistanceBetweenInsertionPoints: nil
+            )
+
+            return lineIndex(forCharacterLocation: location, in: text)
+        }
+
+        private static func lineIndex(forCharacterLocation location: Int, in text: NSString) -> Int {
+            guard text.length > 0 else { return 0 }
+
+            let clampedLocation = max(0, min(location, text.length - 1))
+            var line = 0
+            var scanLocation = 0
+
+            while scanLocation < text.length {
+                let range = text.lineRange(for: NSRange(location: scanLocation, length: 0))
+                if clampedLocation < NSMaxRange(range) {
+                    return line
+                }
+                line += 1
+                scanLocation = NSMaxRange(range)
+            }
+
+            return max(0, line - 1)
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
     func makeNSView(context: Context) -> NSView {
         NSView(frame: .zero)
     }
 
-    func updateNSView(_ nsView: NSView, context: Context) {
-        DispatchQueue.main.async {
-            var current: NSView? = nsView
-            while let view = current {
-                if let scroll = view as? NSScrollView {
-                    scroll.hasVerticalScroller = false
-                    scroll.hasHorizontalScroller = false
-                    scroll.autohidesScrollers = true
-                    break
+    private func firstScrollView(in view: NSView) -> NSScrollView? {
+        if let scroll = view as? NSScrollView {
+            return scroll
+        }
+        for subview in view.subviews {
+            if let found = firstScrollView(in: subview) {
+                return found
+            }
+        }
+        return nil
+    }
+
+    private func locateScrollView(near view: NSView) -> NSScrollView? {
+        if let enclosing = view.enclosingScrollView {
+            return enclosing
+        }
+
+        if let found = firstScrollView(in: view) {
+            return found
+        }
+
+        var current: NSView? = view.superview
+        while let node = current {
+            if let scroll = node as? NSScrollView {
+                return scroll
+            }
+
+            current = node.superview
+        }
+
+        return nil
+    }
+
+    private func applyScrollBarStyle(to scroll: NSScrollView, context: Context) {
+        scroll.hasVerticalScroller = showsVerticalScroller
+        scroll.hasHorizontalScroller = false
+        if showsVerticalScroller {
+            // Keep the play-mode scrollbar persistently visible.
+            scroll.autohidesScrollers = false
+            scroll.scrollerStyle = .legacy
+            scroll.verticalScroller?.isEnabled = true
+            scroll.verticalScroller?.isHidden = false
+            scroll.verticalScroller?.alphaValue = 1.0
+            scroll.flashScrollers()
+        } else {
+            scroll.autohidesScrollers = true
+            scroll.scrollerStyle = .overlay
+            scroll.verticalScroller?.isEnabled = false
+            scroll.verticalScroller?.isHidden = true
+        }
+        scroll.contentInsets = NSEdgeInsets(top: 0, left: 0, bottom: bottomInset, right: 0)
+        scroll.scrollerInsets = NSEdgeInsets(
+            top: topInset,
+            left: 0,
+            bottom: bottomInset,
+            right: rightInset
+        )
+        scroll.verticalScroller?.controlSize = .mini
+        scroll.verticalScroller?.knobStyle = useDarkKnob ? .dark : .light
+
+        if let textView = scroll.documentView as? NSTextView {
+            // Keep the caret origin aligned with the placeholder even when the
+            // document is empty by using container inset for horizontal offset.
+            textView.textContainerInset = NSSize(width: textLeadingInset, height: textTopInset)
+            textView.textContainer?.lineFragmentPadding = 0
+            textView.isEditable = isEditable
+            textView.isSelectable = isEditable
+
+            if isEditable {
+                textView.insertionPointColor = .controlTextColor
+            } else {
+                textView.insertionPointColor = .clear
+                textView.selectedRanges = [NSValue(range: NSRange(location: 0, length: 0))]
+                if let window = textView.window, window.firstResponder === textView {
+                    window.makeFirstResponder(nil)
                 }
-                current = view.superview
+            }
+
+            context.coordinator.updateInteraction(for: textView, onLineTapped: onLineTapped)
+            applyLineHighlight(to: textView)
+        }
+    }
+
+    private func lineRange(for lineIndex: Int, in text: NSString) -> NSRange? {
+        guard lineIndex >= 0 else { return nil }
+        if text.length == 0 {
+            return lineIndex == 0 ? NSRange(location: 0, length: 0) : nil
+        }
+
+        var currentLine = 0
+        var scanLocation = 0
+
+        while scanLocation < text.length {
+            let range = text.lineRange(for: NSRange(location: scanLocation, length: 0))
+            if currentLine == lineIndex {
+                return range
+            }
+            currentLine += 1
+            scanLocation = NSMaxRange(range)
+        }
+
+        return nil
+    }
+
+    private func applyLineHighlight(to textView: NSTextView) {
+        let content = textView.string as NSString
+        if content.length > 0 {
+            let fullRange = NSRange(location: 0, length: content.length)
+            textView.textStorage?.removeAttribute(.backgroundColor, range: fullRange)
+            textView.layoutManager?.removeTemporaryAttribute(.backgroundColor, forCharacterRange: fullRange)
+        }
+
+        textView.wantsLayer = true
+        textView.layer?.sublayers?
+            .filter { $0.name == activeLineLayerName }
+            .forEach { $0.removeFromSuperlayer() }
+
+        guard let lineIndex = highlightedLineIndex,
+              highlightOpacity > 0,
+              let targetRange = lineRange(for: lineIndex, in: content),
+              targetRange.length > 0 else {
+            return
+        }
+
+        let highlightColor = NSColor.systemGreen.withAlphaComponent(0.35)
+        textView.textStorage?.addAttribute(.backgroundColor, value: highlightColor, range: targetRange)
+        textView.layoutManager?.addTemporaryAttribute(.backgroundColor, value: highlightColor, forCharacterRange: targetRange)
+
+        textView.scrollRangeToVisible(targetRange)
+        textView.needsDisplay = true
+    }
+    
+    private func clearLineHighlight(in textView: NSTextView) {
+        let content = textView.string as NSString
+        if content.length > 0 {
+            let fullRange = NSRange(location: 0, length: content.length)
+            textView.textStorage?.removeAttribute(.backgroundColor, range: fullRange)
+            textView.layoutManager?.removeTemporaryAttribute(.backgroundColor, forCharacterRange: fullRange)
+        }
+
+        textView.layer?.sublayers?
+            .filter { $0.name == activeLineLayerName }
+            .forEach { $0.removeFromSuperlayer() }
+    }
+
+    private func applyOrClearHighlight(on textView: NSTextView) {
+        if highlightedLineIndex == nil || highlightOpacity <= 0 {
+            clearLineHighlight(in: textView)
+        } else {
+            applyLineHighlight(to: textView)
+        }
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        func applyStyle(attempt: Int) {
+            guard let scroll = locateScrollView(near: nsView) else {
+                if attempt < 10 {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        applyStyle(attempt: attempt + 1)
+                    }
+                }
+                return
+            }
+
+            applyScrollBarStyle(to: scroll, context: context)
+            if let textView = scroll.documentView as? NSTextView {
+                applyOrClearHighlight(on: textView)
+            }
+        }
+
+        DispatchQueue.main.async {
+            applyStyle(attempt: 0)
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                applyStyle(attempt: 0)
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                applyStyle(attempt: 0)
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
+                applyStyle(attempt: 0)
             }
         }
     }
@@ -302,7 +713,6 @@ final class StyleCaptureRecorder: NSObject, ObservableObject {
 struct ContentView: View {
 
     @StateObject private var store = ScriptStore()
-    @ObservedObject var licenseManager: LicenseManager
     @ObservedObject var speechManager: SpeechManager
     @ObservedObject var overlayController: OverlayWindowController
 
@@ -313,8 +723,13 @@ struct ContentView: View {
     @State private var renamingID: UUID? = nil
     @State private var renameText: String = ""
     @State private var searchQuery: String = ""
+    @State private var draggedScriptID: UUID? = nil
+    @State private var dropInsertionIndex: Int? = nil
     @State private var isImporting: Bool = false
     @State private var showGenerator: Bool = false
+    @State private var showSettingsPanel: Bool = false
+    @State private var stickyNoteWindowControllers: [UUID: StickyNoteWindowController] = [:]
+    @State private var isFileDropTargeted: Bool = false
     @State private var generatorTopic: String = ""
     @State private var generatorAudience: String = ""
     @State private var generatorTone: String = "Conversational"
@@ -327,6 +742,7 @@ struct ContentView: View {
     @State private var generatorStyleProfileText: String = ""
     @State private var generatorIsLoading: Bool = false
     @State private var generatorErrorMessage: String = ""
+    @FocusState private var editorBodyFocused: Bool
     @StateObject private var styleRecorder = StyleCaptureRecorder()
     @AppStorage("snotch.pillLight") private var pillLight: Bool = false
     @AppStorage("snotch.onboardingDone") private var onboardingDone: Bool = true
@@ -376,6 +792,33 @@ struct ContentView: View {
                 }
             }
             .animation(.spring(response: 0.28, dampingFraction: 0.88), value: showSidebar)
+
+            if isFileDropTargeted {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(Color(white: pillLight ? 0.12 : 0.90, opacity: 0.75), style: StrokeStyle(lineWidth: 1.5, dash: [7, 5]))
+                    .padding(16)
+                    .overlay {
+                        VStack(spacing: 6) {
+                            Image(systemName: "doc.text.fill")
+                                .font(.system(size: 18, weight: .semibold))
+                            Text("Drop a .txt script to import")
+                                .font(.system(size: 12, weight: .semibold))
+                        }
+                        .foregroundColor(Color(white: pillLight ? 0.12 : 0.88))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(Color(white: pillLight ? 1.0 : 0.06, opacity: 0.84))
+                        )
+                    }
+                    .transition(.opacity)
+                    .allowsHitTesting(false)
+            }
+
+            if showSettingsPanel {
+                settingsPanelOverlay
+            }
         }
         .preferredColorScheme(pillLight ? .light : .dark)
         .onAppear {
@@ -416,6 +859,14 @@ struct ContentView: View {
             .frame(width: 520)
         }
         .background(hotKeyHandler)
+        .onDrop(of: [UTType.fileURL], isTargeted: $isFileDropTargeted) { providers in
+            handleDroppedFiles(providers)
+        }
+        .onChange(of: draggedScriptID) { _, dragged in
+            if dragged == nil {
+                dropInsertionIndex = nil
+            }
+        }
     }
 
     // MARK: - Sidebar
@@ -474,80 +925,94 @@ struct ContentView: View {
 
             ScrollView(.vertical, showsIndicators: false) {
                 LazyVStack(spacing: 2) {
-                    ForEach(filteredScripts, id: \.id) { script in
-                        SidebarRow(
-                            script: script,
-                            isSelected: selectedID == script.id,
-                            isRenaming: renamingID == script.id,
-                            renameText: $renameText,
-                            onRenameCommit: {
-                                var updated = script
-                                updated.title = renameText.trimmingCharacters(in: .whitespaces).isEmpty
-                                    ? script.title : renameText.trimmingCharacters(in: .whitespaces)
-                                store.update(updated)
-                                if editingScript?.id == script.id { editingScript = updated }
-                                renamingID = nil
-                            },
-                            onRenameCancel: { renamingID = nil },
-                            onRename: { renameText = script.title; renamingID = script.id },
-                            onExportTXT: { exportScript(script, as: .txt) },
-                            onExportMarkdown: { exportScript(script, as: .markdown) },
-                            onExportPDF: { exportScript(script, as: .pdf) },
-                            onDelete: {
-                                store.delete(at: IndexSet([store.scripts.firstIndex(where: { $0.id == script.id })!]))
-                                if selectedID == script.id {
-                                    if let next = filteredScripts.first { select(next) }
-                                    else { selectedID = nil; editingScript = nil }
-                                }
+                    if filteredScripts.isEmpty {
+                        VStack(spacing: 8) {
+                            Image(systemName: "doc.text.magnifyingglass")
+                                .font(.system(size: 16, weight: .regular))
+                                .foregroundColor(Color(white: pillLight ? 0.36 : 0.62))
+                            Text("No scripts found")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(Color(white: pillLight ? 0.34 : 0.60))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 26)
+                    } else {
+                        ForEach(Array(filteredScripts.enumerated()), id: \.element.id) { index, script in
+                            if draggedScriptID != nil && dropInsertionIndex == index {
+                                sidebarDropPlaceholder
+                                    .transition(.opacity)
                             }
-                        )
-                        .onTapGesture { select(script) }
+
+                            SidebarRow(
+                                script: script,
+                                isSelected: selectedID == script.id,
+                                isRenaming: renamingID == script.id,
+                                renameText: $renameText,
+                                onRenameCommit: {
+                                    var updated = script
+                                    updated.title = renameText.trimmingCharacters(in: .whitespaces).isEmpty
+                                        ? script.title : renameText.trimmingCharacters(in: .whitespaces)
+                                    store.update(updated)
+                                    if editingScript?.id == script.id { editingScript = updated }
+                                    renamingID = nil
+                                },
+                                onRenameCancel: { renamingID = nil },
+                                onRename: { renameText = script.title; renamingID = script.id },
+                                onExportTXT: { exportScript(script, as: .txt) },
+                                onExportMarkdown: { exportScript(script, as: .markdown) },
+                                onExportPDF: { exportScript(script, as: .pdf) },
+                                onDelete: {
+                                    store.delete(at: IndexSet([store.scripts.firstIndex(where: { $0.id == script.id })!]))
+                                    if selectedID == script.id {
+                                        if let next = filteredScripts.first { select(next) }
+                                        else { selectedID = nil; editingScript = nil }
+                                    }
+                                }
+                            )
+                            .onTapGesture { select(script) }
+                            .onDrag {
+                                draggedScriptID = script.id
+                                dropInsertionIndex = index
+                                return NSItemProvider(object: script.id.uuidString as NSString)
+                            }
+                            .onDrop(
+                                of: [.text],
+                                delegate: ScriptSidebarDropDelegate(
+                                    targetIndex: index,
+                                    maxIndex: filteredScripts.count,
+                                    draggedID: $draggedScriptID,
+                                    insertionIndex: $dropInsertionIndex,
+                                    onDropAtIndex: moveScript
+                                )
+                            )
+                        }
+
+                        if draggedScriptID != nil && dropInsertionIndex == filteredScripts.count {
+                            sidebarDropPlaceholder
+                                .transition(.opacity)
+                        }
+
+                        Color.clear
+                            .frame(height: 18)
+                            .contentShape(Rectangle())
+                            .onDrop(
+                                of: [.text],
+                                delegate: ScriptSidebarDropDelegate(
+                                    targetIndex: filteredScripts.count,
+                                    maxIndex: filteredScripts.count,
+                                    draggedID: $draggedScriptID,
+                                    insertionIndex: $dropInsertionIndex,
+                                    onDropAtIndex: moveScript
+                                )
+                            )
                     }
                 }
+                .animation(.easeInOut(duration: 0.12), value: dropInsertionIndex)
                 .padding(.horizontal, 8)
                 .padding(.bottom, 8)
             }
 
             Spacer(minLength: 0)
-
-            // App theme toggle
-            VStack(spacing: 0) {
-                Rectangle()
-                    .fill(Color(white: pillLight ? 0 : 1, opacity: 0.06))
-                    .frame(height: 0.5)
-                HStack(spacing: 10) {
-                    Image(systemName: "moon.fill")
-                        .font(.system(size: 11))
-                        .foregroundColor(Color(white: pillLight ? 0.40 : 0.55))
-                        .frame(width: 14)
-                    Text("Dark Mode")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(Color(white: pillLight ? 0.38 : 0.55))
-                    Spacer()
-                    // Pill toggle — knob RIGHT = dark mode ON (!pillLight), LEFT = light mode ON (pillLight)
-                    ZStack(alignment: pillLight ? .leading : .trailing) {
-                        Capsule()
-                            .fill(pillLight
-                                ? Color(white: 1, opacity: 0.10)
-                                : Color(white: 1, opacity: 0.22))
-                            .frame(width: 36, height: 20)
-                            .overlay(
-                                Capsule()
-                                    .strokeBorder(Color(white: pillLight ? 0 : 1, opacity: 0.14), lineWidth: 0.5)
-                            )
-                        Circle()
-                            .fill(pillLight ? Color(white: 0.40) : Color(white: 0.90))
-                            .frame(width: 14, height: 14)
-                            .padding(.horizontal, 3)
-                            .shadow(color: .black.opacity(0.30), radius: 2, y: 1)
-                    }
-                    .animation(.spring(response: 0.28, dampingFraction: 0.78), value: pillLight)
-                    .onTapGesture { pillLight.toggle() }
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 11)
-            }
-            .background(.clear)
 
             // Shortcuts footer
             VStack(spacing: 0) {
@@ -561,6 +1026,7 @@ struct ContentView: View {
                     shortcutRow(keys: ["⌘", "P"],         label: "Play / Stop")
                     shortcutRow(keys: ["⇧", "↑", "/", "↓"], label: "Scroll line")
                     shortcutRow(keys: ["⌘", "["],           label: "Toggle sidebar")
+                    shortcutRow(keys: ["Esc"],              label: "Close app")
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 14)
@@ -578,28 +1044,6 @@ struct ContentView: View {
                     endPoint: .bottom
                 )
             }
-
-            // Reset onboarding
-            Button {
-                // Wipe every key this app has ever written
-                if let domain = Bundle.main.bundleIdentifier {
-                    UserDefaults.standard.removePersistentDomain(forName: domain)
-                    UserDefaults.standard.synchronize()
-                } else {
-                    // Fallback: remove known keys individually
-                    ["snotch.scripts", "snotch.onboardingDone",
-                     "snotch.pillLight"].forEach {
-                        UserDefaults.standard.removeObject(forKey: $0)
-                    }
-                }
-            } label: {
-                Text("Restart Setup")
-                    .font(.system(size: 9.5))
-                    .foregroundColor(Color(white: pillLight ? 0.35 : 0.30))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-            }
-            .buttonStyle(.plain)
         }
     }
 
@@ -636,11 +1080,47 @@ struct ContentView: View {
         }
     }
 
+    private func resetSetup() {
+        if speechManager.isListening {
+            speechManager.stopListening()
+        }
+
+        overlayController.hide()
+
+        if let domain = Bundle.main.bundleIdentifier {
+            UserDefaults.standard.removePersistentDomain(forName: domain)
+        } else {
+            [
+                "snotch.scripts",
+                "snotch.onboardingDone",
+                "snotch.pillLight",
+                "snotch.continuousNotchScroll",
+                "snotch.reading.scrollSpeed",
+                "snotch.reading.scrollSpeed.highlighted",
+                "snotch.reading.scrollSpeed.continuous",
+                "snotch.audio.noiseGate",
+                "snotch.audio.inputGain",
+                "snotch.recents"
+            ].forEach {
+                UserDefaults.standard.removeObject(forKey: $0)
+            }
+        }
+
+        onboardingDone = false
+        UserDefaults.standard.synchronize()
+    }
+
     // MARK: - Editor
 
     private var editorArea: some View {
         GeometryReader { geo in
             let hPad = max(52.0, (geo.size.width - 680.0) / 2.0 + 52.0)
+            let editorColumnWidth = max(340.0, geo.size.width - (hPad * 2.0))
+            let editorScrollBottomGap: CGFloat = 56
+            let editorTextStartInset: CGFloat = 8
+            let editorLineVerticalPadding: CGFloat = 4
+            let editorRowSpacing: CGFloat = 10
+            let editorLineSpacing: CGFloat = editorRowSpacing + (editorLineVerticalPadding * 2)
             VStack(alignment: .leading, spacing: 0) {
                 // Large document title
                 TextField("Untitled", text: Binding(
@@ -650,8 +1130,7 @@ struct ContentView: View {
                         if let s = editingScript { store.update(s) }
                     }
                 ))
-                .font(.custom("Didot", size: 44))
-                .kerning(1.5)
+                .font(.system(size: 44, weight: .light))
                 .foregroundColor(Color(white: pillLight ? 0.06 : 0.94))
                 .textFieldStyle(.plain)
                 .padding(.horizontal, hPad)
@@ -664,36 +1143,83 @@ struct ContentView: View {
                         .padding(.bottom, 10)
                 }
 
-                // Body lines — keep the same teleprompter layout whether playing or paused.
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 10) {
-                            ForEach(Array(speechManager.scriptLines.enumerated()), id: \.offset) { index, line in
-                                Text(line)
-                                    .font(.system(size: fontSize, weight: .light))
-                                    .foregroundColor(Color(white: pillLight ? 0.10 : 0.88))
-                                    .padding(.vertical, 4)
-                                    .padding(.horizontal, 8)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                            .fill(Color(white: pillLight ? 0 : 1, opacity: speechManager.isListening && index == speechManager.currentLineIndex ? 0.12 : 0.0))
-                                    )
-                                    .shadow(
-                                        color: Color(white: pillLight ? 0 : 1, opacity: speechManager.isListening && index == speechManager.currentLineIndex ? 0.20 : 0.0),
-                                        radius: 10, x: 0, y: 0
-                                    )
-                                    .id(index)
+                let isPlaying = speechManager.isListening || speechManager.isCountingDown
+                let editorTextBinding = Binding<String>(
+                    get: {
+                        if isPlaying {
+                            return speechManager.scriptLines.joined(separator: "\n")
+                        }
+                        return scriptBodyBinding.wrappedValue
+                    },
+                    set: { newValue in
+                        guard !isPlaying else { return }
+                        scriptBodyBinding.wrappedValue = newValue
+                    }
+                )
+                ZStack(alignment: .topLeading) {
+                    TextEditor(text: editorTextBinding)
+                        .font(.system(size: fontSize, weight: .light))
+                        .lineSpacing(editorLineSpacing)
+                        .foregroundColor(Color(white: pillLight ? 0.10 : 0.88))
+                        .scrollContentBackground(.hidden)
+                        .snotchTextSelection(enabled: !isPlaying)
+                        .focused($editorBodyFocused)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .background(
+                            EditorScrollBarStyler(
+                                topInset: 6,
+                                bottomInset: editorScrollBottomGap,
+                                rightInset: 28,
+                                useDarkKnob: pillLight,
+                                showsVerticalScroller: false,
+                                textTopInset: editorLineVerticalPadding,
+                                textLeadingInset: editorTextStartInset,
+                                isEditable: !isPlaying,
+                                highlightedLineIndex: isPlaying
+                                    ? min(max(0, speechManager.currentLineIndex), max(0, speechManager.scriptLines.count - 1))
+                                    : nil,
+                                highlightOpacity: isPlaying ? 0.12 : 0,
+                                onLineTapped: isPlaying
+                                    ? { tappedLine in
+                                        speechManager.jumpToLine(tappedLine)
+                                    }
+                                    : nil
+                            )
+                            .id("editor-highlight-\(isPlaying ? 1 : 0)-\(speechManager.currentLineIndex)-\(speechManager.scriptLines.count)")
+                        )
+                        .onChange(of: isPlaying) { playing in
+                            if playing {
+                                editorBodyFocused = false
+                                DispatchQueue.main.async {
+                                    NSApp.keyWindow?.makeFirstResponder(nil)
+                                    NSApp.mainWindow?.makeFirstResponder(nil)
+                                }
                             }
                         }
-                        .padding(.horizontal, hPad)
-                        .padding(.bottom, 48)
-                    }
-                    .onReceive(speechManager.$currentLineIndex.removeDuplicates()) { idx in
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            proxy.scrollTo(idx, anchor: .center)
-                        }
+
+                    if !isPlaying,
+                       (editingScript?.body ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Text("Type your script here...")
+                            .font(.system(size: fontSize, weight: .light))
+                            .foregroundColor(Color(white: pillLight ? 0.35 : 0.46))
+                            .padding(.leading, editorTextStartInset)
+                            .padding(.top, max(0, editorLineVerticalPadding - 2))
+                            .allowsHitTesting(false)
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .padding(.horizontal, 6)
+                .padding(.bottom, 48)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if !isPlaying {
+                        editorBodyFocused = true
+                    }
+                }
+                .frame(maxHeight: .infinity, alignment: .top)
+                .frame(width: editorColumnWidth)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.bottom, editorScrollBottomGap)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             // Top and bottom fade-out mask so text drifts in/out of view softly
@@ -719,7 +1245,7 @@ struct ContentView: View {
                !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Text(scriptDuration)
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
-                    .foregroundColor(Color(white: pillLight ? 0.40 : 0.38))
+                    .foregroundColor(Color(white: pillLight ? 0.24 : 0.94))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(
@@ -771,6 +1297,60 @@ struct ContentView: View {
                     .frame(minWidth: 28)
             }
 
+            Menu {
+                Button {
+                    createStickyNote()
+                } label: {
+                    Label("New Note", systemImage: "plus")
+                }
+
+                if let script = editingScript, !script.stickyNotes.isEmpty {
+                    Divider()
+                    ForEach(Array(script.stickyNotes.enumerated()), id: \.element.id) { index, note in
+                        Button {
+                            openStickyNoteWindow(noteID: note.id)
+                        } label: {
+                            Label("Note \(index + 1)", systemImage: "note.text")
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "note.text.badge.plus")
+                        .font(.system(size: 10.5, weight: .semibold))
+
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9, weight: .bold))
+                }
+                .foregroundColor(Color(white: pillLight ? 0.12 : 0.90))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(Color(white: pillLight ? 0 : 1, opacity: 0.12))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                .strokeBorder(Color(white: pillLight ? 0 : 1, opacity: 0.16), lineWidth: 0.6)
+                        )
+                )
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .help("Sticky notes")
+
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showSettingsPanel = true
+                }
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundColor(Color(white: pillLight ? 0.12 : 0.90))
+                    .frame(width: 20, height: 20)
+            }
+            .buttonStyle(.plain)
+            .help("Open settings")
+
             // Divider
             Rectangle()
                 .fill(Color(white: pillLight ? 0 : 1, opacity: 0.10))
@@ -803,17 +1383,25 @@ struct ContentView: View {
                 speechManager.toggleListening()
             } label: {
                 ZStack {
+                    let idleGreen = pillLight
+                        ? Color(red: 0.84, green: 0.93, blue: 0.87).opacity(0.95)
+                        : Color(red: 0.05, green: 0.42, blue: 0.21).opacity(0.90)
+                    let activeRed = pillLight
+                        ? Color(red: 0.95, green: 0.87, blue: 0.89).opacity(0.95)
+                        : Color(red: 0.34, green: 0.08, blue: 0.10).opacity(0.78)
+
                     Circle()
                         .fill(speechManager.isListening
-                              ? Color(white: pillLight ? 0.75 : 0.28)
-                              : Color(white: pillLight ? 0 : 1, opacity: 0.12))
+                              ? activeRed
+                              : idleGreen)
                         .frame(width: 28, height: 28)
-                        .overlay(Circle().strokeBorder(Color(white: pillLight ? 0 : 1, opacity: 0.14), lineWidth: 0.5))
+                        .overlay(
+                            Circle()
+                                .strokeBorder(Color(white: pillLight ? 0 : 1, opacity: 0.14), lineWidth: 0.5)
+                        )
                     Image(systemName: speechManager.isListening ? "stop.fill" : "play.fill")
                         .font(.system(size: speechManager.isListening ? 9 : 10, weight: .bold))
-                        .foregroundColor(speechManager.isListening
-                            ? Color(white: pillLight ? 0.10 : 0.90)
-                            : Color(white: pillLight ? 0.20 : 0.78))
+                        .foregroundColor(Color(white: pillLight ? 0.14 : 0.94))
                         .offset(x: speechManager.isListening ? 0 : 1)
                 }
             }
@@ -853,6 +1441,50 @@ struct ContentView: View {
         }
         .shadow(color: Color.black.opacity(pillLight ? 0.10 : 0.40), radius: 20, x: 0, y: 6)
         .shadow(color: Color.black.opacity(pillLight ? 0.05 : 0.20), radius: 4,  x: 0, y: 1)
+    }
+
+    private var darkModeBinding: Binding<Bool> {
+        Binding(
+            get: { !pillLight },
+            set: { isDarkMode in
+                pillLight = !isDarkMode
+            }
+        )
+    }
+
+    private var settingsPanelOverlay: some View {
+        ZStack {
+            Color.black
+                .opacity(pillLight ? 0.16 : 0.42)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showSettingsPanel = false
+                    }
+                }
+
+            AppSettingsPanel(
+                speechManager: speechManager,
+                overlayController: overlayController,
+                darkMode: darkModeBinding,
+                pillLight: pillLight,
+                onResetSetup: {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showSettingsPanel = false
+                    }
+                    resetSetup()
+                },
+                onClose: {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showSettingsPanel = false
+                    }
+                }
+            )
+            .padding(.horizontal, 24)
+            .frame(maxWidth: 560)
+            .transition(.scale(scale: 0.96).combined(with: .opacity))
+        }
+        .zIndex(20)
     }
 
     private var emptyState: some View {
@@ -906,6 +1538,91 @@ struct ContentView: View {
         return "~\(m):\(String(format: "%02d", s))"
     }
 
+    private func createStickyNote() {
+        guard var script = editingScript else {
+            NSSound.beep()
+            return
+        }
+
+        let newNote = StickyNoteData(text: "", pinned: false)
+        script.stickyNotes.append(newNote)
+        script.lastEdited = Date()
+        store.update(script)
+        editingScript = script
+
+        openStickyNoteWindow(noteID: newNote.id)
+    }
+
+    private func openStickyNoteWindow(noteID: UUID) {
+        guard let script = editingScript,
+              let noteIndex = script.stickyNotes.firstIndex(where: { $0.id == noteID }) else {
+            NSSound.beep()
+            return
+        }
+
+        let note = script.stickyNotes[noteIndex]
+
+        if stickyNoteWindowControllers[noteID] == nil {
+            stickyNoteWindowControllers[noteID] = StickyNoteWindowController()
+        }
+
+        stickyNoteWindowControllers[noteID]?.present(
+            scriptTitle: script.title,
+            noteNumber: noteIndex + 1,
+            initialText: note.text,
+            initialPinned: note.pinned,
+            onChange: { text, pinned in
+                updateStickyNote(noteID: noteID, text: text, pinned: pinned)
+            },
+            onDelete: {
+                deleteStickyNote(noteID: noteID)
+            }
+        )
+    }
+
+    private func updateStickyNote(noteID: UUID, text: String? = nil, pinned: Bool? = nil) {
+        guard let scriptID = editingScript?.id,
+              let scriptIndex = store.scripts.firstIndex(where: { $0.id == scriptID }),
+              let noteIndex = store.scripts[scriptIndex].stickyNotes.firstIndex(where: { $0.id == noteID }) else {
+            return
+        }
+
+        var script = store.scripts[scriptIndex]
+        if let text {
+            script.stickyNotes[noteIndex].text = text
+        }
+        if let pinned {
+            script.stickyNotes[noteIndex].pinned = pinned
+        }
+        script.lastEdited = Date()
+        store.update(script)
+
+        if editingScript?.id == scriptID {
+            editingScript = script
+        }
+    }
+
+    private func deleteStickyNote(noteID: UUID) {
+        guard let scriptID = editingScript?.id,
+              let scriptIndex = store.scripts.firstIndex(where: { $0.id == scriptID }) else {
+            return
+        }
+
+        var script = store.scripts[scriptIndex]
+        let originalCount = script.stickyNotes.count
+        script.stickyNotes.removeAll(where: { $0.id == noteID })
+        guard script.stickyNotes.count != originalCount else { return }
+
+        script.lastEdited = Date()
+        store.update(script)
+        if editingScript?.id == scriptID {
+            editingScript = script
+        }
+
+        stickyNoteWindowControllers[noteID]?.close()
+        stickyNoteWindowControllers.removeValue(forKey: noteID)
+    }
+
     private func directiveChips(from body: String) -> some View {
         let base = ["<break>", "<slow>", "<fast>", "<focus>"]
             .filter { body.localizedCaseInsensitiveContains($0) }
@@ -944,9 +1661,153 @@ struct ContentView: View {
         }
     }
 
+    private var sidebarDropPlaceholder: some View {
+        RoundedRectangle(cornerRadius: 5, style: .continuous)
+            .fill(Color(white: pillLight ? 0.25 : 0.85, opacity: 0.55))
+            .frame(height: 6)
+            .overlay(
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .strokeBorder(Color(white: pillLight ? 0.05 : 1.0, opacity: 0.40), lineWidth: 0.5)
+            )
+            .padding(.horizontal, 10)
+            .padding(.vertical, 2)
+    }
+
+    private func moveScript(_ draggedID: UUID, toFilteredInsertionIndex insertionIndex: Int) {
+        guard let fromIndex = store.scripts.firstIndex(where: { $0.id == draggedID }),
+              let fromVisibleIndex = filteredScripts.firstIndex(where: { $0.id == draggedID }) else {
+            return
+        }
+
+        var adjustedInsertion = insertionIndex
+        if fromVisibleIndex < insertionIndex {
+            adjustedInsertion -= 1
+        }
+
+        let visibleOrder = filteredScripts
+            .map(\.id)
+            .filter { $0 != draggedID }
+        let clampedIndex = max(0, min(adjustedInsertion, visibleOrder.count))
+        let anchorID = clampedIndex < visibleOrder.count ? visibleOrder[clampedIndex] : nil
+
+        withAnimation(.easeInOut(duration: 0.14)) {
+            let moved = store.scripts.remove(at: fromIndex)
+            if let anchorID,
+               let targetIndex = store.scripts.firstIndex(where: { $0.id == anchorID }) {
+                store.scripts.insert(moved, at: targetIndex)
+            } else {
+                store.scripts.append(moved)
+            }
+        }
+
+        store.save()
+    }
+
+    private var scriptBodyBinding: Binding<String> {
+        Binding(
+            get: { editingScript?.body ?? "" },
+            set: { newValue in
+                guard var script = editingScript else { return }
+                let normalized = normalizeEditorInput(previous: script.body, incoming: newValue)
+                guard normalized != script.body else { return }
+                script.body = normalized
+                script.lastEdited = Date()
+                editingScript = script
+                store.update(script)
+                speechManager.loadScript(normalized)
+            }
+        )
+    }
+
+    private func updateScriptLine(at index: Int, with newValue: String) {
+        guard var script = editingScript else { return }
+        var lines = speechManager.scriptLines
+        guard lines.indices.contains(index) else { return }
+        lines[index] = newValue
+        let merged = lines.joined(separator: "\n")
+        let normalized = normalizeEditorInput(previous: script.body, incoming: merged)
+        script.body = normalized
+        script.lastEdited = Date()
+        editingScript = script
+        store.update(script)
+        speechManager.loadScript(normalized)
+    }
+
     private func handleImport(_ result: Result<[URL], Error>) {
         guard case .success(let urls) = result, let url = urls.first else { return }
-        guard let content = importedText(from: url) else { return }
+        _ = importScript(from: url)
+    }
+
+    private func handleDroppedFiles(_ providers: [NSItemProvider]) -> Bool {
+        guard let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) }) else {
+            return false
+        }
+
+        provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+            guard let url = decodeDroppedFileURL(from: item) else { return }
+            DispatchQueue.main.async {
+                _ = importScript(from: url)
+            }
+        }
+
+        return true
+    }
+
+    private func decodeDroppedFileURL(from item: NSSecureCoding?) -> URL? {
+        func decodeTextURL(_ text: String) -> URL? {
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.hasPrefix("file://"), let url = URL(string: trimmed), url.isFileURL {
+                return url
+            }
+            if trimmed.hasPrefix("/") {
+                return URL(fileURLWithPath: trimmed)
+            }
+            if let decoded = trimmed.removingPercentEncoding, decoded.hasPrefix("/") {
+                return URL(fileURLWithPath: decoded)
+            }
+            if let url = URL(string: trimmed), url.isFileURL {
+                return url
+            }
+            return nil
+        }
+
+        if let url = item as? URL {
+            return url
+        }
+        if let data = item as? Data {
+            if let nsURL = NSURL(absoluteURLWithDataRepresentation: data, relativeTo: nil) as URL? {
+                return nsURL
+            }
+            if let text = String(data: data, encoding: .utf8) {
+                return decodeTextURL(text)
+            }
+        }
+        if let text = item as? String {
+            return decodeTextURL(text)
+        }
+        return nil
+    }
+
+    @discardableResult
+    private func importScript(from url: URL) -> Bool {
+        let ext = url.pathExtension.lowercased()
+        guard ["txt", "md", "pdf", "docx"].contains(ext) else {
+            NSSound.beep()
+            return false
+        }
+
+        let accessed = url.startAccessingSecurityScopedResource()
+        defer {
+            if accessed {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        guard let content = importedText(from: url) else {
+            NSSound.beep()
+            return false
+        }
+
         let cleaned = cleanImportedText(content)
         var script = store.addScript()
         script.title = url.deletingPathExtension().lastPathComponent
@@ -954,12 +1815,19 @@ struct ContentView: View {
         script.lastEdited = Date()
         store.update(script)
         select(script)
+        return true
     }
 
     private func importedText(from url: URL) -> String? {
         let ext = url.pathExtension.lowercased()
         if ext == "txt" || ext == "md" {
-            return try? String(contentsOf: url, encoding: .utf8)
+            if let utf8 = try? String(contentsOf: url, encoding: .utf8) {
+                return utf8
+            }
+            if let unicode = try? String(contentsOf: url, encoding: .unicode) {
+                return unicode
+            }
+            return try? String(contentsOf: url, encoding: .ascii)
         }
         if ext == "pdf", let doc = PDFDocument(url: url) {
             var text = ""
@@ -1050,6 +1918,14 @@ struct ContentView: View {
         let delta = incoming.count - previous.count
         var out = incoming
 
+        // Preserve explicit Enter key presses as-is so manual line breaks
+        // are never swallowed by auto-reflow.
+        if delta == 1,
+           incoming.hasPrefix(previous),
+           incoming.last == "\n" {
+            return incoming
+        }
+
         // Large insertions are usually paste/import content.
         if delta > 20 {
             out = out.replacingOccurrences(of: #"^\s*[-*]\s+"#, with: "", options: .regularExpression)
@@ -1060,19 +1936,8 @@ struct ContentView: View {
             return formatScriptForNotch(out, maxChars: 48)
         }
 
-        // While writing, reflow on natural boundaries so it stays teleprompter-safe.
-        if abs(delta) <= 3,
-           delta > 0,
-           incoming.hasPrefix(previous) {
-            let appended = String(incoming.dropFirst(previous.count))
-            let boundarySet = CharacterSet.whitespacesAndNewlines.union(
-                CharacterSet(charactersIn: ".,!?;:")
-            )
-            let shouldReflow = appended.unicodeScalars.contains { boundarySet.contains($0) }
-            if shouldReflow {
-                return formatScriptForNotch(out, maxChars: 48)
-            }
-        }
+        // Keep normal typing stable (including spaces) and avoid reflowing while
+        // the caret is moving. Reflow is handled for large paste/import content.
 
         // Keep explicit newlines tidy if user manually inserts big spacing.
         out = out.replacingOccurrences(of: #"\n{4,}"#, with: "\n\n\n", options: .regularExpression)
@@ -1148,10 +2013,6 @@ struct ContentView: View {
 
     private func applyGeneratedScriptWithGPT() async -> Bool {
         guard var script = editingScript else { return false }
-        guard let token = licenseManager.activationSummary()?.token, !token.isEmpty else {
-            generatorErrorMessage = "License token missing. Re-activate your license."
-            return false
-        }
 
         let targetMinutes: Double?
         if generatorSetLength {
@@ -1244,7 +2105,6 @@ struct ContentView: View {
 
         do {
             let generated = try await generateScriptWithBackend(
-                token: token,
                 topic: topic,
                 audience: audience.isEmpty ? "General audience" : audience,
                 tone: generatorTone,
@@ -1278,7 +2138,6 @@ struct ContentView: View {
     }
 
     private func generateScriptWithBackend(
-        token: String,
         topic: String,
         audience: String,
         tone: String,
@@ -1302,7 +2161,6 @@ struct ContentView: View {
         var request = URLRequest(url: URL(string: "\(backendBaseURL)/v1/generate/script")!)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONEncoder().encode(requestBody)
 
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -1383,30 +2241,7 @@ struct ContentView: View {
     }
 
     private func requestStyleCaptureTopic() async -> String {
-        guard let token = licenseManager.activationSummary()?.token, !token.isEmpty else {
-            return "Talk for 30 seconds about your favorite app and why you use it daily."
-        }
-
-        do {
-            var request = URLRequest(url: URL(string: "\(backendBaseURL)/v1/generate/bundles")!)
-            request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-            request.httpBody = try JSONEncoder().encode(BackendBundlesRequest(topic: "Personal speaking practice", audience: "General audience"))
-
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-                throw NSError(domain: "Snotch.Generator", code: -3)
-            }
-
-            let decoded = try JSONDecoder().decode(BackendBundlesResponse.self, from: data)
-            if decoded.ok, let first = decoded.hooks.first ?? decoded.titles.first {
-                return first.trimmingCharacters(in: .whitespacesAndNewlines)
-            }
-            return "Talk for 30 seconds about a product you genuinely like and why."
-        } catch {
-            return "Talk for 30 seconds about a product you genuinely like and why."
-        }
+        return "Talk for 30 seconds about your favorite app and why you use it daily."
     }
 
     private struct BackendGenerateRequest: Encodable {
@@ -1452,6 +2287,13 @@ struct ContentView: View {
             .onReceive(NotificationCenter.default.publisher(for: .snotchToggleSidebar)) { _ in
                 showSidebar.toggle()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .snotchImportScriptURL)) { note in
+                guard let url = note.userInfo?["url"] as? URL else { return }
+                _ = importScript(from: url)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .snotchOverlayEditorSaved)) { note in
+                handleOverlayEditorSaved(note)
+            }
     }
 
     private func normalizeStoredScriptsOnLaunch() {
@@ -1482,6 +2324,27 @@ struct ContentView: View {
         editingScript = opened
         speechManager.setActiveScript(id: script.id)
         speechManager.loadScript(opened.body)
+    }
+
+    private func handleOverlayEditorSaved(_ notification: Notification) {
+        guard let id = notification.userInfo?["id"] as? UUID,
+              let body = notification.userInfo?["body"] as? String,
+              let idx = store.scripts.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+
+        var updated = store.scripts[idx]
+        let normalized = formatScriptForNotch(body, maxChars: 48)
+        updated.body = normalized
+        updated.lastEdited = Date()
+        store.update(updated)
+
+        if editingScript?.id == id {
+            editingScript = updated
+        }
+        if speechManager.activeScriptID == id {
+            speechManager.loadScript(normalized)
+        }
     }
 
 }
@@ -1693,7 +2556,7 @@ private struct ScriptGeneratorSheet: View {
             }
         }
         .padding(18)
-        .onChange(of: enableStyleMatch) { enabled in
+        .onChange(of: enableStyleMatch) { _, enabled in
             Task {
                 if enabled {
                     if practiceTopic.isEmpty {
@@ -1731,6 +2594,607 @@ private struct ScriptGeneratorSheet: View {
             if styleRecorder.isRecording {
                 styleRecorder.stopCapture()
             }
+        }
+    }
+}
+
+private struct AppSettingsPanel: View {
+    @ObservedObject var speechManager: SpeechManager
+    @ObservedObject var overlayController: OverlayWindowController
+    @Binding var darkMode: Bool
+    let pillLight: Bool
+    let onResetSetup: () -> Void
+    let onClose: () -> Void
+    @State private var micGranted: Bool = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+    @State private var speechGranted: Bool = SFSpeechRecognizer.authorizationStatus() == .authorized
+    @State private var accessibilityGranted: Bool = AXIsProcessTrusted()
+    @State private var permissionPollTimer: Timer? = nil
+
+    private var readingModeBinding: Binding<Int> {
+        Binding(
+            get: { speechManager.continuousScrollInNotch ? 1 : 0 },
+            set: { speechManager.continuousScrollInNotch = ($0 == 1) }
+        )
+    }
+
+    private var gateBinding: Binding<Double> {
+        Binding(
+            get: { speechManager.noiseGate },
+            set: { speechManager.setNoiseGate($0) }
+        )
+    }
+
+    private var gainBinding: Binding<Double> {
+        Binding(
+            get: { speechManager.inputGain },
+            set: { speechManager.setInputGain($0) }
+        )
+    }
+
+    private var meterLevel: CGFloat {
+        CGFloat(min(1, max(0, speechManager.audioLevel)))
+    }
+
+    private var hideOverlayInCaptureBinding: Binding<Bool> {
+        Binding(
+            get: { overlayController.hideOverlayInScreenCapture },
+            set: { enabled in
+                overlayController.setHideOverlayInScreenCapture(enabled)
+            }
+        )
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Settings")
+                        .font(.system(size: 16, weight: .semibold))
+                    Text("Theme, reading mode, and audio tuning")
+                        .font(.system(size: 11))
+                        .foregroundColor(Color(white: pillLight ? 0.40 : 0.62))
+                }
+
+                Spacer()
+
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(Color(white: pillLight ? 0.20 : 0.85))
+                        .frame(width: 26, height: 26)
+                        .background(
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                .fill(Color(white: pillLight ? 0 : 1, opacity: 0.09))
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
+            .background(Color(white: pillLight ? 1.0 : 0.10, opacity: pillLight ? 0.80 : 0.74))
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    SettingsSectionCard(title: "Appearance", subtitle: "Window theme", pillLight: pillLight) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "moon.fill")
+                                .font(.system(size: 11))
+                                .foregroundColor(Color(white: pillLight ? 0.40 : 0.55))
+                                .frame(width: 14)
+
+                            Text("Dark Mode")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(Color(white: pillLight ? 0.14 : 0.90))
+
+                            Spacer()
+
+                            ZStack(alignment: darkMode ? .trailing : .leading) {
+                                Capsule()
+                                    .fill(darkMode
+                                        ? Color(white: 1, opacity: 0.22)
+                                        : Color(white: 1, opacity: 0.10))
+                                    .frame(width: 36, height: 20)
+                                    .overlay(
+                                        Capsule()
+                                            .strokeBorder(Color(white: pillLight ? 0 : 1, opacity: 0.14), lineWidth: 0.5)
+                                    )
+
+                                Circle()
+                                    .fill(darkMode ? Color(white: 0.90) : Color(white: 0.40))
+                                    .frame(width: 14, height: 14)
+                                    .padding(.horizontal, 3)
+                                    .shadow(color: .black.opacity(0.30), radius: 2, y: 1)
+                            }
+                            .animation(.spring(response: 0.28, dampingFraction: 0.78), value: darkMode)
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            darkMode.toggle()
+                        }
+                    }
+
+                    SettingsSectionCard(title: "Permissions", subtitle: "System access", pillLight: pillLight) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            PermissionStatusRow(
+                                icon: "mic.fill",
+                                label: "Microphone",
+                                granted: micGranted,
+                                actionLabel: "Allow",
+                                pillLight: pillLight,
+                                onAction: requestMicrophonePermission
+                            )
+
+                            PermissionStatusRow(
+                                icon: "waveform",
+                                label: "Speech Recognition",
+                                granted: speechGranted,
+                                actionLabel: "Allow",
+                                pillLight: pillLight,
+                                onAction: requestSpeechPermission
+                            )
+
+                            PermissionStatusRow(
+                                icon: "keyboard",
+                                label: "Accessibility",
+                                granted: accessibilityGranted,
+                                actionLabel: "Open Settings",
+                                pillLight: pillLight,
+                                onAction: openAccessibilitySettings
+                            )
+                        }
+                    }
+
+                    SettingsSectionCard(title: "Reading", subtitle: "Prompt behavior", pillLight: pillLight) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Reading Mode")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(Color(white: pillLight ? 0.28 : 0.72))
+
+                            Picker("Reading Mode", selection: readingModeBinding) {
+                                Text("Highlighted").tag(0)
+                                Text("Continuous").tag(1)
+                            }
+                            .pickerStyle(.segmented)
+                            .tint(Color(white: pillLight ? 0.16 : 0.24))
+                        }
+                    }
+
+                    SettingsSectionCard(title: "Audio", subtitle: "Input tuning", pillLight: pillLight) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack {
+                                    Text("Noise Gate")
+                                        .font(.system(size: 11, weight: .medium))
+                                    Spacer()
+                                    Text("\(Int(speechManager.noiseGate * 100))%")
+                                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                        .foregroundColor(.secondary)
+                                }
+                                Slider(value: gateBinding, in: 0.0...1.0, step: 0.01)
+                                HStack {
+                                    Text("Low gate (more sensitive)")
+                                    Spacer()
+                                    Text("High gate (more filtering)")
+                                }
+                                .font(.system(size: 9.5))
+                                .foregroundColor(.secondary)
+                            }
+
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack {
+                                    Text("Input Gain")
+                                        .font(.system(size: 11, weight: .medium))
+                                    Spacer()
+                                    Text(String(format: "%.2fx", speechManager.inputGain))
+                                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                        .foregroundColor(.secondary)
+                                }
+                                Slider(value: gainBinding, in: 0.5...3.0, step: 0.05)
+                            }
+
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack {
+                                    Text("VU Meter")
+                                        .font(.system(size: 11, weight: .medium))
+                                    Spacer()
+                                    Text(speechManager.isVoiceActive ? "Voice detected" : (speechManager.isListening ? "Listening..." : "Mic idle"))
+                                        .font(.system(size: 9.5, weight: .medium))
+                                        .foregroundColor(.secondary)
+                                }
+                                GeometryReader { geo in
+                                    let width = geo.size.width
+                                    ZStack(alignment: .leading) {
+                                        Capsule()
+                                            .fill(Color(white: pillLight ? 0 : 1, opacity: 0.10))
+
+                                        Capsule()
+                                            .fill(
+                                                LinearGradient(
+                                                    colors: [
+                                                        Color.green.opacity(0.85),
+                                                        Color.yellow.opacity(0.85),
+                                                        Color.red.opacity(0.85)
+                                                    ],
+                                                    startPoint: .leading,
+                                                    endPoint: .trailing
+                                                )
+                                            )
+                                            .frame(width: max(4, meterLevel * width))
+
+                                        Rectangle()
+                                            .fill(Color(white: pillLight ? 0.1 : 1.0, opacity: 0.9))
+                                            .frame(width: 1.5)
+                                            .padding(.vertical, 1)
+                                            .offset(x: max(0, min(width - 2, CGFloat(speechManager.noiseGate) * width)))
+                                    }
+                                }
+                                .frame(height: 11)
+                            }
+
+                            Text("If scrolling triggers too easily, raise Noise Gate. If it misses your voice, lower Noise Gate or increase Input Gain.")
+                                .font(.system(size: 10))
+                                .foregroundColor(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+
+                            HStack {
+                                Spacer()
+                                Button("Reset Audio") {
+                                    speechManager.resetAudioTuning()
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                        }
+                    }
+                }
+                .padding(16)
+            }
+        }
+        .frame(maxWidth: 520, maxHeight: 560)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color(white: pillLight ? 0.97 : 0.08, opacity: 0.96))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(Color(white: pillLight ? 0 : 1, opacity: 0.16), lineWidth: 0.6)
+                )
+        )
+        .shadow(color: Color.black.opacity(pillLight ? 0.20 : 0.46), radius: 26, x: 0, y: 8)
+        .preferredColorScheme(pillLight ? .light : .dark)
+        .onAppear {
+            refreshPermissionStates()
+            startPermissionPolling()
+        }
+        .onDisappear {
+            permissionPollTimer?.invalidate()
+            permissionPollTimer = nil
+        }
+    }
+
+    private func refreshPermissionStates() {
+        micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+        speechGranted = SFSpeechRecognizer.authorizationStatus() == .authorized
+        accessibilityGranted = AXIsProcessTrusted()
+    }
+
+    private func requestMicrophonePermission() {
+        AVCaptureDevice.requestAccess(for: .audio) { _ in
+            DispatchQueue.main.async {
+                refreshPermissionStates()
+            }
+        }
+    }
+
+    private func requestSpeechPermission() {
+        SFSpeechRecognizer.requestAuthorization { _ in
+            DispatchQueue.main.async {
+                refreshPermissionStates()
+            }
+        }
+    }
+
+    private func openAccessibilitySettings() {
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        _ = AXIsProcessTrustedWithOptions(options)
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
+        }
+        startPermissionPolling()
+    }
+
+    private func startPermissionPolling() {
+        permissionPollTimer?.invalidate()
+        permissionPollTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            DispatchQueue.main.async {
+                refreshPermissionStates()
+            }
+        }
+    }
+}
+
+private struct PermissionStatusRow: View {
+    let icon: String
+    let label: String
+    let granted: Bool
+    let actionLabel: String
+    let pillLight: Bool
+    let onAction: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(granted
+                    ? Color(red: 0.27, green: 0.68, blue: 0.45)
+                    : Color(white: pillLight ? 0.36 : 0.72))
+                .frame(width: 16)
+
+            Text(label)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(Color(white: pillLight ? 0.14 : 0.90))
+
+            Spacer()
+
+            if granted {
+                Text("Granted")
+                    .font(.system(size: 9.5, weight: .semibold))
+                    .foregroundColor(Color(red: 0.27, green: 0.68, blue: 0.45))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(Color(red: 0.27, green: 0.68, blue: 0.45).opacity(0.14))
+                    )
+            } else {
+                Button(actionLabel) {
+                    onAction()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(Color(white: pillLight ? 0 : 1, opacity: 0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .strokeBorder(Color(white: pillLight ? 0 : 1, opacity: 0.10), lineWidth: 0.5)
+                )
+        )
+    }
+}
+
+private struct SettingsSectionCard<Content: View>: View {
+    let title: String
+    let subtitle: String
+    let pillLight: Bool
+    let content: Content
+
+    init(title: String, subtitle: String, pillLight: Bool, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.subtitle = subtitle
+        self.pillLight = pillLight
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(Color(white: pillLight ? 0.16 : 0.90))
+                Spacer()
+                Text(subtitle)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(Color(white: pillLight ? 0.40 : 0.62))
+            }
+
+            content
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color(white: pillLight ? 0 : 1, opacity: pillLight ? 0.05 : 0.08))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(Color(white: pillLight ? 0 : 1, opacity: 0.12), lineWidth: 0.5)
+                )
+        )
+    }
+}
+
+final class StickyNoteWindowController: NSWindowController {
+
+    init() {
+        let window = NSWindow(
+            contentRect: CGRect(x: 0, y: 0, width: 380, height: 320),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.isReleasedWhenClosed = false
+        window.collectionBehavior = [.fullScreenAuxiliary, .moveToActiveSpace]
+        super.init(window: window)
+    }
+
+    required init?(coder: NSCoder) {
+        nil
+    }
+
+    func present(
+        scriptTitle: String,
+        noteNumber: Int,
+        initialText: String,
+        initialPinned: Bool,
+        onChange: @escaping (String, Bool) -> Void,
+        onDelete: @escaping () -> Void
+    ) {
+        let isLight = UserDefaults.standard.bool(forKey: "snotch.pillLight")
+        let view = StickyNoteWindowView(
+            scriptTitle: scriptTitle,
+            noteNumber: noteNumber,
+            initialText: initialText,
+            initialPinned: initialPinned,
+            onChange: onChange,
+            onDelete: onDelete,
+            onPinnedChanged: { [weak self] pinned in
+                guard let window = self?.window else { return }
+                window.level = pinned ? .floating : .normal
+                window.collectionBehavior = pinned
+                    ? [.canJoinAllSpaces, .fullScreenAuxiliary]
+                    : [.fullScreenAuxiliary, .moveToActiveSpace]
+            }
+        )
+
+        window?.appearance = NSAppearance(named: isLight ? .aqua : .darkAqua)
+        window?.contentViewController = NSHostingController(rootView: view)
+        showWindow(nil)
+        window?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+}
+
+private struct StickyNoteWindowView: View {
+    let scriptTitle: String
+    let noteNumber: Int
+    let onChange: (String, Bool) -> Void
+    let onDelete: () -> Void
+    let onPinnedChanged: (Bool) -> Void
+
+    @AppStorage("snotch.pillLight") private var pillLight: Bool = false
+    @State private var text: String
+    @State private var pinned: Bool
+
+    private var secondaryText: Color {
+        Color(white: pillLight ? 0.42 : 0.58)
+    }
+
+    private var dividerColor: Color {
+        Color(white: pillLight ? 0 : 1, opacity: 0.11)
+    }
+
+    private var panelBackground: Color {
+        Color(white: pillLight ? 0.94 : 0.10)
+    }
+
+    private var editorBackground: Color {
+        Color(white: pillLight ? 1.0 : 0.07)
+    }
+
+    private var editorText: Color {
+        Color(white: pillLight ? 0.10 : 0.93)
+    }
+
+    private var deleteForeground: Color {
+        Color(white: pillLight ? 0.22 : 0.86)
+    }
+
+    private var deleteBackground: Color {
+        pillLight
+            ? Color(red: 0.95, green: 0.87, blue: 0.89).opacity(0.95)
+            : Color(red: 0.34, green: 0.08, blue: 0.10).opacity(0.78)
+    }
+
+    private var pinnedForeground: Color {
+        pinned ? Color(white: pillLight ? 0.12 : 0.94) : Color(white: pillLight ? 0.22 : 0.82)
+    }
+
+    private var pinnedBackground: Color {
+        pinned
+            ? (pillLight
+                ? Color(red: 0.84, green: 0.93, blue: 0.87).opacity(0.95)
+                : Color(red: 0.05, green: 0.42, blue: 0.21).opacity(0.90))
+            : Color(white: pillLight ? 0 : 1, opacity: 0.09)
+    }
+
+    init(
+        scriptTitle: String,
+        noteNumber: Int,
+        initialText: String,
+        initialPinned: Bool,
+        onChange: @escaping (String, Bool) -> Void,
+        onDelete: @escaping () -> Void,
+        onPinnedChanged: @escaping (Bool) -> Void
+    ) {
+        self.scriptTitle = scriptTitle
+        self.noteNumber = noteNumber
+        self.onChange = onChange
+        self.onDelete = onDelete
+        self.onPinnedChanged = onPinnedChanged
+        _text = State(initialValue: initialText)
+        _pinned = State(initialValue: initialPinned)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                if !scriptTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text("\(scriptTitle)  •  Note \(noteNumber)")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(secondaryText)
+                        .lineLimit(1)
+                }
+                Spacer()
+
+                Button {
+                    pinned.toggle()
+                } label: {
+                    Image(systemName: pinned ? "pin.fill" : "pin")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(pinnedForeground)
+                        .frame(width: 30, height: 30)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(pinnedBackground)
+                        )
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    onDelete()
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(deleteForeground)
+                        .frame(width: 30, height: 30)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(deleteBackground)
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+
+            Rectangle()
+                .fill(dividerColor)
+                .frame(height: 0.5)
+
+            TextEditor(text: $text)
+                .font(.system(size: 15, weight: .regular, design: .monospaced))
+                .lineSpacing(4)
+                .scrollContentBackground(.hidden)
+                .padding(12)
+                .background(editorBackground)
+                .foregroundColor(editorText)
+        }
+        .background(panelBackground)
+        .frame(minWidth: 340, minHeight: 280)
+        .preferredColorScheme(pillLight ? .light : .dark)
+        .onAppear {
+            onPinnedChanged(pinned)
+            onChange(text, pinned)
+        }
+        .onChange(of: text) { _, value in
+            onChange(value, pinned)
+        }
+        .onChange(of: pinned) { _, value in
+            onPinnedChanged(value)
+            onChange(text, value)
         }
     }
 }
@@ -1872,10 +3336,52 @@ struct SidebarRow: View {
     }
 }
 
+private struct ScriptSidebarDropDelegate: DropDelegate {
+    let targetIndex: Int
+    let maxIndex: Int
+    @Binding var draggedID: UUID?
+    @Binding var insertionIndex: Int?
+    let onDropAtIndex: (UUID, Int) -> Void
+
+    private var clampedIndex: Int {
+        max(0, min(targetIndex, maxIndex))
+    }
+
+    func validateDrop(info: DropInfo) -> Bool {
+        draggedID != nil
+    }
+
+    func dropEntered(info: DropInfo) {
+        insertionIndex = clampedIndex
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        insertionIndex = clampedIndex
+        return DropProposal(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        guard let draggedScriptID = draggedID else {
+            insertionIndex = nil
+            return false
+        }
+        onDropAtIndex(draggedScriptID, clampedIndex)
+        draggedID = nil
+        insertionIndex = nil
+        return true
+    }
+
+    func dropExited(info: DropInfo) {
+        // Keep current order; item remains draggable until dropped.
+    }
+}
+
 // MARK: - Notification Names
 
 extension Notification.Name {
     static let snotchScrollUp      = Notification.Name("snotch.scrollUp")
     static let snotchScrollDown    = Notification.Name("snotch.scrollDown")
     static let snotchToggleSidebar = Notification.Name("snotch.toggleSidebar")
+    static let snotchImportScriptURL = Notification.Name("snotch.importScriptURL")
+    static let snotchOverlayEditorSaved = Notification.Name("snotch.overlayEditorSaved")
 }

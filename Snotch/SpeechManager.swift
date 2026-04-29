@@ -6,13 +6,52 @@ final class SpeechManager: NSObject, ObservableObject {
 
     @Published var isListening:      Bool   = false
     @Published var currentLineIndex: Int    = 0
+    @Published var currentWordIndexInLine: Int = 0
     @Published var scriptLines:      [String] = []
     @Published var micAuthStatus:    AVAuthorizationStatus = .notDetermined
     @Published var lastSpokenText:   String = ""
     @Published var isCalibrating:    Bool   = false
     @Published var calibrationDone:  Bool   = false
     @Published var wordsPerMinute:   Double = 192
-    @Published var scrollSpeed:      Double = 1.0
+    @Published var scrollSpeed:      Double = 1.6 {
+        didSet {
+            persistPreferredScrollSpeed()
+        }
+    }
+    @Published var continuousScrollInNotch: Bool = false {
+        didSet {
+            UserDefaults.standard.set(continuousScrollInNotch, forKey: continuousScrollPrefKey)
+            applyPreferredScrollSpeedForCurrentMode()
+            if continuousScrollInNotch {
+                holdUntil = nil
+                speedMultiplier = 1.0
+                cadenceTarget = 1.0
+                cadenceValue = 1.0
+                voicePaceTarget = 1.0
+                voicePaceValue = 1.0
+            }
+            if isListening {
+                if continuousScrollInNotch {
+                    applyDirectives(for: currentLineIndex)
+                    if voiceActive && scrollTimer == nil && !scriptLines.isEmpty {
+                        startScrollTimer()
+                    }
+                } else {
+                    silenceTimer?.invalidate(); silenceTimer = nil
+                    voiceActive = false
+                    isVoiceActive = false
+                    scrollTimer?.invalidate(); scrollTimer = nil
+                    lineAccum = 0
+                    currentWordIndexInLine = 0
+                    continuousLineProgress = Double(currentLineIndex)
+                }
+            } else if !continuousScrollInNotch {
+                currentWordIndexInLine = 0
+                continuousLineProgress = Double(currentLineIndex)
+            }
+        }
+    }
+    @Published var continuousLineProgress: Double = 0
     @Published var isPaused:         Bool   = false
     @Published var audioLevel:       Float  = 0
     @Published var isVoiceActive:    Bool   = false
@@ -24,6 +63,8 @@ final class SpeechManager: NSObject, ObservableObject {
     @Published var fillerCountSession: Int  = 0
     @Published var fillerHeatmap:    [String: Int] = ["Intro": 0, "Body": 0, "Outro": 0]
     @Published var scriptTrend:      [Double] = []
+    @Published private(set) var noiseGate: Double = 0.45
+    @Published private(set) var inputGain: Double = 1.0
 
     private var audioEngine:    AVAudioEngine = AVAudioEngine()
     private var scrollTimer:    Timer?
@@ -37,7 +78,7 @@ final class SpeechManager: NSObject, ObservableObject {
     private var holdUntil:      Date?
     private var linesAdvancedSession: Int = 0
     private var sessionStart:   Date?
-    private var activeScriptID: UUID?
+    @Published private(set) var activeScriptID: UUID?
     private var cueBreaks:       Set<Int> = []
     private var consumedBreaks:  Set<Int> = []
     private var slowLines:       Set<Int> = []
@@ -48,9 +89,22 @@ final class SpeechManager: NSObject, ObservableObject {
     private var pendingStartAfterPermission: Bool = false
     private var noiseFloorRMS:  Float = 0.0008
     private var warmupUntil: Date?
+    private var cadenceTarget: Double = 1.0
+    private var cadenceValue: Double = 1.0
+    private var cadenceRefreshAt: Date = .distantPast
+    private var voicePaceTarget: Double = 1.0
+    private var voicePaceValue: Double = 1.0
+    private var voiceActivateHitStreak: Int = 0
+    private var voiceQuietHitStreak: Int = 0
+    private var lineWordTimingCache: [Int: [Double]] = [:]
+    private var scriptEnded: Bool = false
+    private let continuousScrollPrefKey = "snotch.continuousNotchScroll"
+    private let scrollSpeedPrefKey = "snotch.reading.scrollSpeed"
+    private let highlightedSpeedPrefKey = "snotch.reading.scrollSpeed.highlighted"
+    private let continuousSpeedPrefKey = "snotch.reading.scrollSpeed.continuous"
+    private let noiseGatePrefKey = "snotch.audio.noiseGate"
+    private let inputGainPrefKey = "snotch.audio.inputGain"
 
-    // How loud the mic needs to be to count as voice (0.0–1.0 RMS)
-    private let rmsThreshold:   Float        = 0.00008
     // Baseline silence timeout, adjusted dynamically with RMS for breath-aware pausing
     private let silenceTimeout: TimeInterval = 0.4
 
@@ -58,7 +112,84 @@ final class SpeechManager: NSObject, ObservableObject {
 
     override init() {
         super.init()
+        continuousScrollInNotch = UserDefaults.standard.bool(forKey: continuousScrollPrefKey)
+        scrollSpeed = preferredScrollSpeedForCurrentMode()
+        noiseGate = clampNoiseGate(UserDefaults.standard.object(forKey: noiseGatePrefKey) as? Double ?? 0.45)
+        inputGain = clampInputGain(UserDefaults.standard.object(forKey: inputGainPrefKey) as? Double ?? 1.0)
+        continuousLineProgress = Double(currentLineIndex)
         checkPermissions()
+    }
+
+    func setNoiseGate(_ value: Double) {
+        let clamped = clampNoiseGate(value)
+        noiseGate = clamped
+        UserDefaults.standard.set(clamped, forKey: noiseGatePrefKey)
+    }
+
+    func setInputGain(_ value: Double) {
+        let clamped = clampInputGain(value)
+        inputGain = clamped
+        UserDefaults.standard.set(clamped, forKey: inputGainPrefKey)
+    }
+
+    func resetAudioTuning() {
+        setNoiseGate(0.45)
+        setInputGain(1.0)
+    }
+
+    private func persistPreferredScrollSpeed() {
+        let clamped = min(3.0, max(0.5, scrollSpeed))
+        if clamped != scrollSpeed {
+            scrollSpeed = clamped
+            return
+        }
+
+        UserDefaults.standard.set(clamped, forKey: scrollSpeedPrefKey)
+        let modeKey = continuousScrollInNotch ? continuousSpeedPrefKey : highlightedSpeedPrefKey
+        UserDefaults.standard.set(clamped, forKey: modeKey)
+    }
+
+    private func defaultScrollSpeedForCurrentMode() -> Double {
+        continuousScrollInNotch ? 1.6 : 1.1
+    }
+
+    private func preferredScrollSpeedForCurrentMode() -> Double {
+        let modeKey = continuousScrollInNotch ? continuousSpeedPrefKey : highlightedSpeedPrefKey
+        if let modeStored = UserDefaults.standard.object(forKey: modeKey) as? Double {
+            return min(3.0, max(0.5, modeStored))
+        }
+
+        // Legacy fallback for continuous mode only; highlighted defaults to 1.1x.
+        if continuousScrollInNotch,
+           let legacy = UserDefaults.standard.object(forKey: scrollSpeedPrefKey) as? Double {
+            return min(3.0, max(0.5, legacy))
+        }
+
+        return defaultScrollSpeedForCurrentMode()
+    }
+
+    private func applyPreferredScrollSpeedForCurrentMode() {
+        let preferred = preferredScrollSpeedForCurrentMode()
+        guard abs(scrollSpeed - preferred) > 0.0001 else { return }
+        DispatchQueue.main.async {
+            if abs(self.scrollSpeed - preferred) > 0.0001 {
+                self.scrollSpeed = preferred
+            }
+        }
+    }
+
+    private func clampNoiseGate(_ value: Double) -> Double {
+        min(1.0, max(0.0, value))
+    }
+
+    private func clampInputGain(_ value: Double) -> Double {
+        min(3.0, max(0.5, value))
+    }
+
+    private func currentGateThreshold() -> Float {
+        let minThreshold: Float = 0.00003
+        let maxThreshold: Float = 0.00110
+        return minThreshold + Float(noiseGate) * (maxThreshold - minThreshold)
     }
 
     func loadScript(_ text: String) {
@@ -119,14 +250,25 @@ final class SpeechManager: NSObject, ObservableObject {
         fillerTriggeredOnLine = []
         pauseForCue = false
         focusGlow = false
+        lineWordTimingCache = [:]
         speedMultiplier = 1.0
         holdUntil = nil
+        cadenceTarget = 1.0
+        cadenceValue = 1.0
+        voicePaceTarget = 1.0
+        voicePaceValue = 1.0
+        voiceActivateHitStreak = 0
+        voiceQuietHitStreak = 0
+        cadenceRefreshAt = Date()
+        scriptEnded = false
         // Compute average words per line so the scroll rate matches actual speech pace
         let totalWords = lines.reduce(0) { $0 + $1.split(separator: " ").count }
         if !lines.isEmpty { avgWordsPerLine = max(1.0, Double(totalWords) / Double(lines.count)) }
         lineAccum = 0
         DispatchQueue.main.async {
             self.currentLineIndex = 0
+            self.currentWordIndexInLine = 0
+            self.continuousLineProgress = 0
             self.isVoiceActive = false
         }
     }
@@ -156,6 +298,102 @@ final class SpeechManager: NSObject, ObservableObject {
         guard scriptLines.indices.contains(index) else { return 1 }
         let tokens = scriptLines[index].split(whereSeparator: \.isWhitespace)
         return max(1, tokens.count)
+    }
+
+    private func wordTimingProfile(for index: Int) -> [Double] {
+        let expectedWordCount = wordsInLine(at: index)
+        if let cached = lineWordTimingCache[index], cached.count == expectedWordCount {
+            return cached
+        }
+
+        let profile = buildWordTimingProfile(for: index)
+        lineWordTimingCache[index] = profile
+        return profile
+    }
+
+    private func buildWordTimingProfile(for index: Int) -> [Double] {
+        guard scriptLines.indices.contains(index) else { return [1] }
+
+        let words = scriptLines[index].split(whereSeparator: \.isWhitespace).map(String.init)
+        guard words.count > 1 else { return [1] }
+
+        var weights = Array(repeating: 1.0, count: words.count)
+
+        // Base human variation per word.
+        for i in weights.indices {
+            weights[i] *= Double.random(in: 0.84...1.18)
+        }
+
+        // Punctuation naturally creates tiny pauses.
+        for (i, token) in words.enumerated() {
+            if token.hasSuffix("...") {
+                weights[i] *= Double.random(in: 1.42...1.70)
+            } else if token.hasSuffix(".") || token.hasSuffix("!") || token.hasSuffix("?") {
+                weights[i] *= Double.random(in: 1.28...1.52)
+            } else if token.hasSuffix(",") || token.hasSuffix(";") || token.hasSuffix(":") {
+                weights[i] *= Double.random(in: 1.10...1.28)
+            }
+        }
+
+        // Occasionally consume two adjacent words faster, as in natural speech runs.
+        let pairSlots = max(0, words.count - 1)
+        if pairSlots > 0 {
+            let maxPairs = max(1, words.count / 5)
+            let pairCount = Int.random(in: 0...maxPairs)
+            var usedStarts: Set<Int> = []
+
+            for _ in 0..<pairCount {
+                let candidates = (0..<pairSlots).filter {
+                    !usedStarts.contains($0) && !usedStarts.contains($0 - 1) && !usedStarts.contains($0 + 1)
+                }
+                guard let start = candidates.randomElement() else { break }
+
+                usedStarts.insert(start)
+                weights[start] *= Double.random(in: 0.58...0.76)
+                weights[start + 1] *= Double.random(in: 0.62...0.82)
+
+                if start > 0 {
+                    weights[start - 1] *= Double.random(in: 1.05...1.20)
+                }
+            }
+        }
+
+        // Small random breath-like hold point inside longer lines.
+        if words.count >= 4 && Bool.random() {
+            let breathIndex = Int.random(in: 1..<(words.count - 1))
+            weights[breathIndex] *= Double.random(in: 1.18...1.36)
+        }
+
+        weights = weights.map { min(2.2, max(0.42, $0)) }
+
+        let total = weights.reduce(0, +)
+        guard total > 0 else {
+            return Array(repeating: 1.0 / Double(words.count), count: words.count)
+        }
+
+        return weights.map { $0 / total }
+    }
+
+    private func updateCurrentWordIndexInLine() {
+        let words = wordsInLine(at: currentLineIndex)
+        if words <= 1 {
+            currentWordIndexInLine = 0
+            return
+        }
+
+        let profile = wordTimingProfile(for: currentLineIndex)
+        let progress = min(max(lineAccum, 0), 0.999)
+
+        var cumulative = 0.0
+        for (index, weight) in profile.enumerated() {
+            cumulative += weight
+            if progress < cumulative {
+                currentWordIndexInLine = index
+                return
+            }
+        }
+
+        currentWordIndexInLine = words - 1
     }
 
     private func bestSplitIndex(in text: String, preferredMax: Int, hardMax: Int) -> String.Index {
@@ -207,6 +445,8 @@ final class SpeechManager: NSObject, ObservableObject {
         warmupUntil = Date().addingTimeInterval(0.7)
         voiceActive = false
         isVoiceActive = false
+        voiceActivateHitStreak = 0
+        voiceQuietHitStreak = 0
 
         audioEngine = AVAudioEngine()
         let inputNode = audioEngine.inputNode
@@ -224,7 +464,9 @@ final class SpeechManager: NSObject, ObservableObject {
         do {
             audioEngine.prepare()
             try audioEngine.start()
-            DispatchQueue.main.async { self.isListening = true }
+            DispatchQueue.main.async {
+                self.isListening = true
+            }
         } catch {
             print("SpeechManager: engine failed to start — \(error)")
         }
@@ -236,6 +478,8 @@ final class SpeechManager: NSObject, ObservableObject {
         silenceTimer?.invalidate(); silenceTimer = nil
         voiceActive = false
         isVoiceActive = false
+        voiceActivateHitStreak = 0
+        voiceQuietHitStreak = 0
         // lineAccum intentionally preserved — resume will continue mid-line
         if audioEngine.isRunning { audioEngine.stop() }
         audioEngine.inputNode.removeTap(onBus: 0)
@@ -280,13 +524,46 @@ final class SpeechManager: NSObject, ObservableObject {
 
     func scrollUp() {
         DispatchQueue.main.async {
-            self.currentLineIndex = max(0, self.currentLineIndex - 1)
+            guard !self.scriptLines.isEmpty else { return }
+            let nextIndex = max(0, self.currentLineIndex - 1)
+            let changed = nextIndex != self.currentLineIndex
+            self.currentLineIndex = nextIndex
+            self.lineAccum = 0
+            self.currentWordIndexInLine = 0
+            self.continuousLineProgress = Double(self.currentLineIndex)
+            if changed {
+                self.scriptEnded = false
+            }
         }
     }
 
     func scrollDown() {
         DispatchQueue.main.async {
-            self.currentLineIndex = min(self.scriptLines.count - 1, self.currentLineIndex + 1)
+            guard !self.scriptLines.isEmpty else { return }
+            let nextIndex = min(self.scriptLines.count - 1, self.currentLineIndex + 1)
+            let changed = nextIndex != self.currentLineIndex
+            self.currentLineIndex = nextIndex
+            self.lineAccum = 0
+            self.currentWordIndexInLine = 0
+            self.continuousLineProgress = Double(self.currentLineIndex)
+            if changed {
+                self.scriptEnded = false
+            }
+        }
+    }
+
+    func jumpToLine(_ index: Int) {
+        DispatchQueue.main.async {
+            guard !self.scriptLines.isEmpty else { return }
+
+            let target = min(max(0, index), self.scriptLines.count - 1)
+            self.currentLineIndex = target
+            self.lineAccum = 0
+            self.currentWordIndexInLine = 0
+            self.continuousLineProgress = Double(target)
+            self.scriptEnded = false
+            self.pauseForCue = false
+            self.applyDirectives(for: target)
         }
     }
 
@@ -317,22 +594,64 @@ final class SpeechManager: NSObject, ObservableObject {
         guard count > 0 else { return }
 
         let (rms, _) = meterValues(from: buffer, frameCount: count)
-        let boosted = min(rms * 24.0, 1.0)
+        let gainedRMS = rms * Float(inputGain)
+        let boosted = min(gainedRMS * 24.0, 1.0)
 
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             // Exponential smoothing — decays naturally to 0 when silent
             self.audioLevel = 0.45 * boosted + 0.55 * self.audioLevel
 
+            let now = Date()
+
             if !self.voiceActive,
-               let warmupUntil = self.warmupUntil,
-               Date() > warmupUntil {
-                self.noiseFloorRMS = 0.988 * self.noiseFloorRMS + 0.012 * rms
+               let warmupUntil = self.warmupUntil {
+                if now > warmupUntil {
+                    self.noiseFloorRMS = 0.988 * self.noiseFloorRMS + 0.012 * gainedRMS
+                } else {
+                    // Ignore early activation during warmup to avoid immediate false starts.
+                    return
+                }
             }
 
-            let adaptive = max(self.rmsThreshold, min(0.0020, self.noiseFloorRMS * 1.12 + 0.000025))
-            if rms > adaptive || self.audioLevel > 0.015 {
-                self.handleVoiceBurst(rms: max(rms, adaptive))
+            let gate = self.currentGateThreshold()
+            let adaptive = max(gate, min(0.0035, self.noiseFloorRMS * 1.15 + gate * 0.22))
+
+            // Entry requires stronger confidence than sustain. This prevents
+            // steady room noise from latching speech active.
+            let activateThreshold = max(adaptive * 1.03, self.noiseFloorRMS * 1.65 + gate * 0.08)
+            let sustainThreshold = max(adaptive * 0.78, self.noiseFloorRMS * 1.28)
+
+            let strongSpeech = gainedRMS >= activateThreshold
+            let sustainSpeech = gainedRMS >= sustainThreshold
+
+            if strongSpeech {
+                self.voiceActivateHitStreak = min(8, self.voiceActivateHitStreak + 1)
+                self.voiceQuietHitStreak = 0
+            } else if self.voiceActive && sustainSpeech {
+                self.voiceActivateHitStreak = min(8, self.voiceActivateHitStreak + 1)
+                self.voiceQuietHitStreak = 0
+            } else {
+                self.voiceQuietHitStreak = min(12, self.voiceQuietHitStreak + 1)
+                self.voiceActivateHitStreak = max(0, self.voiceActivateHitStreak - 1)
+            }
+
+            if !self.voiceActive {
+                if self.voiceActivateHitStreak >= 2 {
+                    self.handleVoiceBurst(rms: max(gainedRMS, activateThreshold))
+                }
+            } else {
+                if sustainSpeech {
+                    self.handleVoiceBurst(rms: max(gainedRMS, sustainThreshold))
+                } else if self.voiceQuietHitStreak >= 4 {
+                    // Hard stop when voice confidence drops for several frames.
+                    self.voiceActive = false
+                    self.isVoiceActive = false
+                    self.silenceTimer?.invalidate()
+                    self.silenceTimer = nil
+                    self.scrollTimer?.invalidate()
+                    self.scrollTimer = nil
+                }
             }
         }
     }
@@ -453,12 +772,32 @@ final class SpeechManager: NSObject, ObservableObject {
     }
 
     private func handleVoiceBurst(rms: Float) {
+        guard !scriptLines.isEmpty, !scriptEnded else {
+            scrollTimer?.invalidate()
+            scrollTimer = nil
+            voiceActive = false
+            DispatchQueue.main.async { self.isVoiceActive = false }
+            return
+        }
+
         // Push the silence deadline forward on every voice burst
         silenceTimer?.invalidate()
         let dynamicSilence = dynamicSilenceTimeout(rms: rms)
+
+        if continuousScrollInNotch {
+            voicePaceTarget = 1.0
+            voicePaceValue = 1.0
+        } else {
+            let gate = currentGateThreshold()
+            let gateRatio = Double(max(0.0, min(2.8, rms / max(gate, 0.00001))))
+            voicePaceTarget = min(1.22, max(0.92, 0.90 + gateRatio * 0.14))
+        }
+
         silenceTimer = Timer.scheduledTimer(withTimeInterval: dynamicSilence, repeats: false) { [weak self] _ in
             guard let self else { return }
             self.voiceActive = false
+            self.voiceActivateHitStreak = 0
+            self.voiceQuietHitStreak = 0
             DispatchQueue.main.async { self.isVoiceActive = false }
             self.scrollTimer?.invalidate()
             self.scrollTimer = nil
@@ -491,41 +830,146 @@ final class SpeechManager: NSObject, ObservableObject {
     }
 
     private func startScrollTimer() {
-        // Tick at 20 Hz while voice is active.
-        scrollTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
+        if scrollTimer != nil { return }
+
+        // Tick slightly faster for smoother interpolation.
+        let tickInterval: TimeInterval = 0.04
+        scrollTimer = Timer.scheduledTimer(withTimeInterval: tickInterval, repeats: true) { [weak self] _ in
             guard let self, !self.isPaused, !self.scriptLines.isEmpty else { return }
+
+            guard self.voiceActive else {
+                self.scrollTimer?.invalidate()
+                self.scrollTimer = nil
+                return
+            }
+
+            if self.scriptEnded {
+                self.scrollTimer?.invalidate()
+                self.scrollTimer = nil
+                return
+            }
+
+            let now = Date()
             if let holdUntil, Date() < holdUntil {
                 return
             } else {
                 self.holdUntil = nil
             }
+
+            let isContinuousMode = self.continuousScrollInNotch
+
+            if isContinuousMode {
+                self.cadenceTarget = 1.0
+                self.cadenceValue = 1.0
+                self.voicePaceValue = 1.0
+            } else if now >= self.cadenceRefreshAt {
+                self.cadenceTarget = Double.random(in: 0.95...1.07)
+                self.cadenceRefreshAt = now.addingTimeInterval(Double.random(in: 0.25...0.75))
+            }
+
+            if !isContinuousMode {
+                self.cadenceValue += (self.cadenceTarget - self.cadenceValue) * 0.14
+                self.voicePaceValue += (self.voicePaceTarget - self.voicePaceValue) * 0.18
+            }
+
             let currentWords = Double(self.wordsInLine(at: self.currentLineIndex))
-            let linesPerSec = (self.wordsPerMinute / 60.0) / max(1.0, currentWords)
-            self.lineAccum += linesPerSec * self.scrollSpeed * self.speedMultiplier * 0.05
-            if self.lineAccum >= 1.0 {
-                if self.shouldPauseForCue() {
-                    self.lineAccum = 0
-                    self.pauseForCue = true
-                    self.voiceActive = false
-                    DispatchQueue.main.async { self.isVoiceActive = false }
-                    self.scrollTimer?.invalidate()
-                    self.scrollTimer = nil
+            let effectiveWords = max(currentWords, self.avgWordsPerLine)
+            let linesPerSec = (self.wordsPerMinute / 60.0) / max(1.0, effectiveWords)
+            let smoothDamping = 0.82
+            let directiveSpeed = isContinuousMode ? 1.0 : self.speedMultiplier
+            let cadenceFactor = isContinuousMode ? 1.0 : self.cadenceValue
+            let voicePaceFactor = isContinuousMode ? 1.0 : self.voicePaceValue
+            self.lineAccum += linesPerSec
+                * self.scrollSpeed
+                * directiveSpeed
+                * smoothDamping
+                * cadenceFactor
+                * voicePaceFactor
+                * tickInterval
+
+            while self.lineAccum >= 1.0 {
+                let previousIndex = self.currentLineIndex
+                if previousIndex >= self.scriptLines.count - 1 {
+                    self.finishScriptProgression()
                     return
                 }
+
                 self.lineAccum -= 1.0
                 self.currentLineIndex = min(self.currentLineIndex + 1, self.scriptLines.count - 1)
                 self.linesAdvancedSession += 1
+                if !isContinuousMode {
+                    self.applyTransitionPause(afterLine: previousIndex)
+                }
                 self.applyDirectives(for: self.currentLineIndex)
             }
+
+            self.updateCurrentWordIndexInLine()
+
+            let maxProgress = Double(max(0, self.scriptLines.count - 1))
+            let smoothProgress = min(maxProgress, Double(self.currentLineIndex) + min(self.lineAccum, 0.999))
+            // Keep progress continuous in both modes so Highlighted mode can
+            // scroll smoothly while still using current-word emphasis.
+            self.continuousLineProgress = smoothProgress
         }
     }
 
     private func applyDirectives(for index: Int) {
+        if continuousScrollInNotch {
+            speedMultiplier = 1.0
+            return
+        }
+
         speedMultiplier = slowLines.contains(index) ? 0.75 : (fastLines.contains(index) ? 1.35 : 1.0)
         focusGlow = focusLines.contains(index)
         if let hold = holdLines[index] {
-            holdUntil = Date().addingTimeInterval(hold)
+            extendHold(by: hold)
         }
+    }
+
+    private func finishScriptProgression() {
+        let lastIndex = max(0, scriptLines.count - 1)
+        currentLineIndex = lastIndex
+        currentWordIndexInLine = max(0, wordsInLine(at: lastIndex) - 1)
+        continuousLineProgress = Double(lastIndex)
+        lineAccum = 0
+        scriptEnded = true
+        pauseForCue = false
+        holdUntil = nil
+        scrollTimer?.invalidate()
+        scrollTimer = nil
+        voiceActive = false
+        DispatchQueue.main.async { self.isVoiceActive = false }
+    }
+
+    private func applyTransitionPause(afterLine index: Int) {
+        guard scriptLines.indices.contains(index) else { return }
+        let line = scriptLines[index].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !line.isEmpty else { return }
+
+        let pause: TimeInterval
+        if line.hasSuffix("...") {
+            pause = Double.random(in: 0.24...0.38)
+        } else if line.hasSuffix(".") || line.hasSuffix("!") || line.hasSuffix("?") {
+            pause = Double.random(in: 0.16...0.30)
+        } else if line.hasSuffix(";") || line.hasSuffix(":") {
+            pause = Double.random(in: 0.11...0.22)
+        } else if line.hasSuffix(",") {
+            pause = Double.random(in: 0.06...0.15)
+        } else {
+            pause = 0
+        }
+
+        if pause > 0 {
+            extendHold(by: pause)
+        }
+    }
+
+    private func extendHold(by duration: TimeInterval) {
+        let until = Date().addingTimeInterval(duration)
+        if let holdUntil, holdUntil > until {
+            return
+        }
+        holdUntil = until
     }
 
     private func holdSeconds(from line: String) -> TimeInterval? {
@@ -551,10 +995,11 @@ final class SpeechManager: NSObject, ObservableObject {
     }
 
     private func dynamicSilenceTimeout(rms: Float) -> TimeInterval {
-        let clamped = max(rmsThreshold, min(0.045, rms))
-        let norm = Double((clamped - rmsThreshold) / (0.045 - rmsThreshold))
-        // Keep stop behavior snappy after speaking ends.
-        return max(0.16, min(0.42, silenceTimeout * 0.38 + norm * 0.12))
+        let threshold = currentGateThreshold()
+        let clamped = max(threshold, min(0.045, rms))
+        let norm = Double((clamped - threshold) / max(0.00001, 0.045 - threshold))
+        // Fast enough to stop drift, long enough to survive short syllable gaps.
+        return max(0.28, min(0.60, silenceTimeout * 0.72 + norm * 0.22))
     }
 
     private func incrementHeatmapSection(for index: Int) {

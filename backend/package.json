@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
+    "lint": "node --check src/server.js && node --check src/store.js",
+    "test": "node --test",
     "import:licenses": "node scripts/import_licenses.js",
     "secrets": "node scripts/generate_secrets.js"
   },
@@ -16,5 +18,8 @@
     "express-rate-limit": "^7.4.1",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "supertest": "^7.1.3"
   }
 }
