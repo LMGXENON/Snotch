@@ -6,8 +6,39 @@
     <br />
     A free, open-source teleprompter that scrolls with your voice and keeps your eyes on the camera.
     <br /><br />
-    <a href="/downloads/Snotch-1.0.dmg">
-      <img src="https://img.shields.io/badge/-Download_for_macOS-000?style=for-the-badge&logo=apple&logoColor=white&labelColor=333" height="54" alt="Download for macOS" />
+    <style>
+      .snotch-download-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.5rem;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: #fff;
+        text-decoration: none;
+        font-weight: 500;
+        font-size: 16px;
+        transition: all 0.2s ease-out;
+        box-shadow: 0 0 40px rgba(11, 0, 238, 0.3), 0 0 100px rgba(11, 0, 238, 0.2);
+      }
+      .snotch-download-btn:hover {
+        transform: translateY(-2px);
+        background: rgba(255, 255, 255, 0.15);
+        box-shadow: 0 0 40px rgba(11, 0, 238, 0.5), 0 0 100px rgba(11, 0, 238, 0.3);
+      }
+      .snotch-download-btn svg {
+        width: 20px;
+        height: 20px;
+      }
+    </style>
+    <a href="/downloads/Snotch-1.0.dmg" class="snotch-download-btn">
+      <svg viewBox="0 0 50 50" fill="currentColor" style="width: 20px; height: 20px;">
+        <path d="M44.52734,34.75c-1.07812,2.39453 -1.59766,3.46484 -2.98437,5.57813c-1.94141,2.95313 -4.67969,6.64063 -8.0625,6.66406c-3.01172,0.02734 -3.78906,-1.96484 -7.87891,-1.92969c-4.08594,0.01953 -4.9375,1.96875 -7.95312,1.9375c-3.38672,-0.03125 -5.97656,-3.35156 -7.91797,-6.30078c-5.42969,-8.26953 -6.00391,-17.96484 -2.64844,-23.12109c2.375,-3.65625 6.12891,-5.80469 9.65625,-5.80469c3.59375,0 5.85156,1.97266 8.82031,1.97266c2.88281,0 4.63672,-1.97656 8.79297,-1.97656c3.14063,0 6.46094,1.71094 8.83594,4.66406c-7.76562,4.25781 -6.50391,15.34766 1.33984,18.31641zM31.19531,8.46875c1.51172,-1.94141 2.66016,-4.67969 2.24219,-7.46875c-2.46484,0.16797 -5.34766,1.74219 -7.03125,3.78125c-1.52734,1.85938 -2.79297,4.61719 -2.30078,7.28516c2.69141,0.08594 5.47656,-1.51953 7.08984,-3.59766z"/>
+      </svg>
+      Download for macOS
     </a>
     &nbsp;
     <a href="https://www.producthunt.com/products/snotch?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-snotch" target="_blank" rel="noopener noreferrer">
