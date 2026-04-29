@@ -7,7 +7,7 @@
     A free, open-source teleprompter that scrolls with your voice and keeps your eyes on the camera.
     <br /><br />
     <a href="/Snotch-1.0.dmg">
-      <img alt="Download for macOS" height="54" src="https://img.shields.io/badge/-Download%20for%20macOS-000000?style=for-the-badge&logo=apple&logoColor=white" />
+      <img src="https://img.shields.io/badge/-Download_for_macOS-000?style=for-the-badge&logo=apple&logoColor=white&labelColor=333" height="54" alt="Download for macOS" />
     </a>
     &nbsp;
     <a href="https://www.producthunt.com/products/snotch?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-snotch" target="_blank" rel="noopener noreferrer">
@@ -18,21 +18,23 @@
 
 <br/>
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-macOS-lightgrey)](https://www.snotch.app/)
-[![Free Forever](https://img.shields.io/badge/free-forever-brightgreen)](https://www.snotch.app/)
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
+  <a href="https://www.snotch.app/"><img src="https://img.shields.io/badge/platform-macOS-lightgrey" alt="Platform"></a>
+  <a href="https://www.snotch.app/"><img src="https://img.shields.io/badge/free-forever-brightgreen" alt="Free Forever"></a>
+</p>
 
 <p align="center">
   <img src="/assets/phmain.png" alt="Snotch demo" width="900" />
 </p>
 
-**How to use Snotch:** https://www.snotch.app/
+**How to use Snotch:** [https://www.snotch.app/](https://www.snotch.app/)
 
 Snotch sits near your camera and scrolls as you speak. It's built around one problem: sounding natural on camera when you have a script. Fixed-speed teleprompters never match how you actually talk. Snotch listens to your voice and follows you — so you can focus on delivering, not keeping up with a timer.
 
 Tucked into the notch, it keeps your script as close to the lens as possible so eye contact stays real. Everything runs locally. Nothing leaves your machine.
 
-No cloud. No API keys. No subscriptions.
+**No cloud. No API keys. No subscriptions.**
 
 ---
 
@@ -53,25 +55,25 @@ No cloud. No API keys. No subscriptions.
 
 ## Use cases
 
-- **Video recording** — Read scripts naturally while keeping your eyes close to the lens.
-- **Meetings & demos** — Stay on message with talking points always in view.
-- **Presentations** — Deliver smoothly without looking down at notes.
-- **Interviews & podcasts** — Track questions, intros, and transitions without losing flow.
-- **Live streaming** — Follow prepared segments with a more confident, composed delivery.
+* **Video recording** — Read scripts naturally while keeping your eyes close to the lens.
+* **Meetings & demos** — Stay on message with talking points always in view.
+* **Presentations** — Deliver smoothly without looking down at notes.
+* **Interviews & podcasts** — Track questions, intros, and transitions without losing flow.
+* **Live streaming** — Follow prepared segments with a more confident, composed delivery.
 
 ---
 
 ## How it works
 
-1. Open Snotch and paste your script — or load a `.txt`, `.pdf`, or `.docx` from the menu.
-2. Minimise into the pill and position it near your webcam.
-3. Pick Voice mode or Manual mode from the settings menu.
-4. Adjust font, theme, opacity, microphone sensitivity, and more any time from settings.
+1.  Open Snotch and paste your script — or load a `.txt`, `.pdf`, or `.docx` from the menu.
+2.  Minimise into the pill and position it near your webcam.
+3.  Pick **Voice mode** or **Manual mode** from the settings menu.
+4.  Adjust font, theme, opacity, microphone sensitivity, and more any time from settings.
 
 ### Modes
 
-- **Voice mode** — The script tracks your delivery as you speak and pauses when you do.
-- **Manual mode** — Scroll at a fixed pace for a consistent, controlled rhythm.
+* **Voice mode** — The script tracks your delivery as you speak and pauses when you do.
+* **Manual mode** — Scroll at a fixed pace for a consistent, controlled rhythm.
 
 ---
 
