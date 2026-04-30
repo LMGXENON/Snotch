@@ -82,8 +82,6 @@ Distributed under the MIT License. See [LICENSE](LICENSE) for more information.
 
 ## Star History
 
-## Star History
-
 <a href="https://www.star-history.com/?type=date&repos=LMGXENON%2FSnotch">
  <picture>
    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=LMGXENON/Snotch&type=date&theme=dark&legend=top-left" />
