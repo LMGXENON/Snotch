@@ -21,6 +21,7 @@ struct SnotchApp: App {
             Group {
                 if onboardingDone {
                     ContentView(
+                        licenseManager: licenseManager,
                         speechManager:     speechManager,
                         overlayController: overlayController
                     )
