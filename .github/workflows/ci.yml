@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  # Backend CI removed: repository no longer contains a backend service
+
+  macos-build:
+    name: macOS Build
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build app
+        run: >-
+          xcodebuild
+          -project Snotch.xcodeproj
+          -scheme Snotch
+          -configuration Debug
+          -destination "platform=macOS"
+          CODE_SIGNING_ALLOWED=NO
+          build
